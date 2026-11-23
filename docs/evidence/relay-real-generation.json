@@ -1,0 +1,35 @@
+{
+  "image": "docs/relay-generated-example.png",
+  "job": {
+    "id": "be6560da-98a3-4464-93d6-fbca1507d4ae",
+    "status": "SUCCEEDED",
+    "request": {
+      "prompt": "masterpiece, best quality, anime scenery, a red cabin beside a calm mountain lake, sunrise, no people",
+      "negative_prompt": "low quality, blurry",
+      "width": 256,
+      "height": 256,
+      "steps": 8,
+      "seed": 42
+    },
+    "created": 1795431319331,
+    "started": 1795431323862,
+    "finished": 1795431474462,
+    "error": null,
+    "metadata": {
+      "model": "circlestone-labs/Anima-Base-v1.0-Diffusers",
+      "revision": "073c3a9db359c31ad0e8aa268d15775473c2176c",
+      "device": "cpu",
+      "dtype": "bfloat16",
+      "elapsed_seconds": 148.47417795,
+      "rss_at_completion_bytes": 5848678400,
+      "width": 256,
+      "height": 256,
+      "steps": 8,
+      "seed": 42,
+      "sha256": "acb8548ab457ea3b62bbdabd966cdc682349aab7d0d7c665bfe33748bd577971"
+    },
+    "image_url": "/v1/jobs/be6560da-98a3-4464-93d6-fbca1507d4ae/image"
+  },
+  "http_image_status": 200,
+  "elapsed_seconds": 155.34007337799994
+}

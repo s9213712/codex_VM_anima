@@ -14,6 +14,8 @@ def init():
     with connect() as c:
         c.execute('PRAGMA journal_mode=WAL')
         c.execute('CREATE TABLE IF NOT EXISTS jobs(id text PRIMARY KEY,status text NOT NULL,request text NOT NULL,created real NOT NULL,started real,finished real,error text,metadata text)')
+        if 'dedupe_key' not in [row['name'] for row in c.execute('PRAGMA table_info(jobs)')]:c.execute('ALTER TABLE jobs ADD COLUMN dedupe_key TEXT')
+        c.execute('CREATE UNIQUE INDEX IF NOT EXISTS job_dedupe ON jobs(dedupe_key) WHERE dedupe_key IS NOT NULL')
         c.execute('CREATE TABLE IF NOT EXISTS system(key text PRIMARY KEY,value text NOT NULL)')
 
 def status(key,value=None):
@@ -22,12 +24,15 @@ def status(key,value=None):
         row=c.execute('SELECT value FROM system WHERE key=?',(key,)).fetchone()
         return json.loads(row['value']) if row else None
 
-def enqueue(data):
+def enqueue(data,dedupe_key=None):
     with connect() as c:
         c.execute('BEGIN IMMEDIATE')
+        if dedupe_key:
+            prior=c.execute('SELECT id FROM jobs WHERE dedupe_key=?',(dedupe_key,)).fetchone()
+            if prior:return prior['id']
         if c.execute("SELECT count(*) FROM jobs WHERE status IN ('PENDING','RUNNING')").fetchone()[0]>=2:raise OverflowError('Queue full; retry later')
         if c.execute('SELECT count(*) FROM jobs').fetchone()[0]>=20:raise OverflowError('20-task session budget reached; review before restarting')
-        ident=str(uuid.uuid4());c.execute('INSERT INTO jobs(id,status,request,created) VALUES(?,?,?,?)',(ident,'PENDING',json.dumps(data),time.time()))
+        ident=str(uuid.uuid4());c.execute('INSERT INTO jobs(id,status,request,created,dedupe_key) VALUES(?,?,?,?,?)',(ident,'PENDING',json.dumps(data),time.time(),dedupe_key))
         return ident
 
 def claim():

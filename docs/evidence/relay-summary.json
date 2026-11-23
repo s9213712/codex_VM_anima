@@ -1,0 +1,18 @@
+{
+  "verified_at": 1795431541.0849168,
+  "scope": "LOCAL Miniflare/workerd + actual CPU Anima; not a public deployment",
+  "image_http_status": 200,
+  "end_to_end_seconds": 155.34007337799994,
+  "generation_seconds": 148.47417795,
+  "sha256": "acb8548ab457ea3b62bbdabd966cdc682349aab7d0d7c665bfe33748bd577971",
+  "api_tests": 6,
+  "relay_runtime_tests": 5,
+  "wrangler_dry_run": "PASS",
+  "public_url": null,
+  "free_plan": "confirmed by user",
+  "pending": [
+    "Cloudflare Account ID",
+    "Cloudflare API token via Environment Secrets",
+    "public endpoint verification"
+  ]
+}

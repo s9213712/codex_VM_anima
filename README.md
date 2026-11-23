@@ -46,3 +46,10 @@ API及Tunnel最長3小時；模型loading超過180秒停止。服務重啟會將
 `.venv/bin/pytest -q` 驗證API、參數、佇列、重啟；它不載入模型，不能替代真實生圖測試。
 當次實際API生成結果記錄在docs/evidence；歷史結果不會冒充此次實測。
 原始碼zip排除模型cache、SQLite、token及API key；請另存使用者指定的外部儲存，否則仍可能在VM重建後遺失。
+
+## HTTPS 圖片工作中繼
+
+已新增 [relay/README.md](relay/README.md)：外部HTTP提交 → Cloudflare Worker／SQLite DO → VM主動拉取 → 真實Anima生成 → PNG上傳／下載。
+固定圖片schema、不同角色金鑰、lease、每日20任務、重送去重。它使用普通HTTPS443，沒有通用TCP／命令轉送。
+本機Miniflare與真實Anima的端到端測試已成功；公開Worker尚未部署，仍需Cloudflare Account ID與最小權限Token以Environment Secrets提供。
+使用者已確認Workers Free，不啟用付費功能。實際workers.dev端點的可達性仍須公開部署後驗證。

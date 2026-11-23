@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/workspace/anima-server/relay/deploy.py", line 56, in <module>
+    if __name__=='__main__':main()
+                            ^^^^^^
+  File "/workspace/anima-server/relay/deploy.py", line 12, in main
+    if not token or not re.fullmatch(r'[0-9a-fA-F]{32}',account):raise RuntimeError('BLOCKED: configure CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in Environment Secrets; never paste the token in chat')
+                                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: BLOCKED: configure CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in Environment Secrets; never paste the token in chat

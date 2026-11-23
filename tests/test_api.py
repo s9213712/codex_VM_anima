@@ -43,3 +43,11 @@ def test_restart_and_model_observation(client):
     assert store.status('model')['current_rss_bytes']==1024
     ident=store.enqueue({'prompt':'fixture'});store.claim();store.interrupted('test restart')
     assert store.get(ident)['status']=='FAILED'
+
+def test_relay_idempotency_survives_repeated_delivery(client):
+    store.status('model',{'state':'READY'})
+    ident=str(uuid.uuid4());headers={**auth(),'Idempotency-Key':ident}
+    a=client.post('/v1/generations',headers=headers,json={'prompt':'first'})
+    b=client.post('/v1/generations',headers=headers,json={'prompt':'first'})
+    assert a.status_code==202 and b.status_code==202 and a.json()['id']==b.json()['id']
+    with store.connect() as c:assert c.execute('SELECT count(*) FROM jobs').fetchone()[0]==1

@@ -1,0 +1,67 @@
+STATUS PENDING 0.1
+STATUS RUNNING 5.1
+STATUS RUNNING 10.1
+STATUS RUNNING 15.1
+STATUS RUNNING 20.1
+STATUS RUNNING 25.1
+STATUS RUNNING 30.1
+STATUS RUNNING 35.1
+STATUS RUNNING 40.1
+STATUS RUNNING 45.1
+STATUS RUNNING 50.1
+STATUS RUNNING 55.1
+STATUS RUNNING 60.1
+STATUS RUNNING 65.1
+STATUS RUNNING 70.2
+STATUS RUNNING 75.2
+STATUS RUNNING 80.2
+STATUS RUNNING 85.2
+STATUS RUNNING 90.2
+STATUS RUNNING 95.2
+STATUS RUNNING 100.2
+STATUS RUNNING 105.2
+STATUS RUNNING 110.2
+STATUS RUNNING 115.3
+STATUS RUNNING 120.3
+STATUS RUNNING 125.3
+STATUS RUNNING 130.3
+STATUS RUNNING 135.3
+STATUS RUNNING 140.3
+STATUS RUNNING 145.3
+STATUS RUNNING 150.3
+STATUS SUCCEEDED 155.3
+{
+  "image": "docs/relay-generated-example.png",
+  "job": {
+    "id": "be6560da-98a3-4464-93d6-fbca1507d4ae",
+    "status": "SUCCEEDED",
+    "request": {
+      "prompt": "masterpiece, best quality, anime scenery, a red cabin beside a calm mountain lake, sunrise, no people",
+      "negative_prompt": "low quality, blurry",
+      "width": 256,
+      "height": 256,
+      "steps": 8,
+      "seed": 42
+    },
+    "created": 1795431319331,
+    "started": 1795431323862,
+    "finished": 1795431474462,
+    "error": null,
+    "metadata": {
+      "model": "circlestone-labs/Anima-Base-v1.0-Diffusers",
+      "revision": "073c3a9db359c31ad0e8aa268d15775473c2176c",
+      "device": "cpu",
+      "dtype": "bfloat16",
+      "elapsed_seconds": 148.47417795,
+      "rss_at_completion_bytes": 5848678400,
+      "width": 256,
+      "height": 256,
+      "steps": 8,
+      "seed": 42,
+      "sha256": "acb8548ab457ea3b62bbdabd966cdc682349aab7d0d7c665bfe33748bd577971"
+    },
+    "image_url": "/v1/jobs/be6560da-98a3-4464-93d6-fbca1507d4ae/image"
+  },
+  "http_image_status": 200,
+  "elapsed_seconds": 155.34007337799994
+}

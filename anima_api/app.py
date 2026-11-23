@@ -1,7 +1,7 @@
 import asyncio,contextlib,json,os,secrets,subprocess,sys,time,uuid
 from contextlib import asynccontextmanager
 import psutil
-from fastapi import Depends,FastAPI,HTTPException
+from fastapi import Depends,FastAPI,HTTPException,Header
 from fastapi.security import HTTPAuthorizationCredentials,HTTPBearer
 from fastapi.responses import FileResponse
 from pydantic import BaseModel,Field,field_validator
@@ -70,9 +70,9 @@ def health():
     model=store.status('model') or {'state':'STARTING'}
     return {'ready':model.get('state')=='READY','model':model,'ephemeral':True}
 @app.post('/v1/generations',status_code=202,dependencies=[Depends(auth)])
-def generate(request:Generate):
+def generate(request:Generate,idempotency_key:uuid.UUID|None=Header(default=None)):
     if (store.status('model') or {}).get('state')!='READY':raise HTTPException(503,'Model not ready')
-    try:ident=store.enqueue(request.model_dump())
+    try:ident=store.enqueue(request.model_dump(),str(idempotency_key) if idempotency_key else None)
     except OverflowError as e:raise HTTPException(429,str(e),headers={'Retry-After':'30'})
     return {'id':ident,'status_url':'/v1/jobs/'+ident}
 @app.get('/v1/jobs/{ident}',dependencies=[Depends(auth)])

@@ -1,0 +1,9 @@
+{
+  "name": "anima-job-relay",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-07-30",
+  "workers_dev": true,
+  "durable_objects": {"bindings": [{"name": "RELAY", "class_name": "AnimaRelay"}]},
+  "migrations": [{"tag": "v1", "new_sqlite_classes": ["AnimaRelay"]}],
+  "observability": {"enabled": false}
+}

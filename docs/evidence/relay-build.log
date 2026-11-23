@@ -1,0 +1,12 @@
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+
+ ⛅️ wrangler 4.166.0
+────────────────────
+Total Upload: 10.93 KiB / gzip: 3.72 KiB
+Your Worker has access to the following bindings:
+Binding                     Resource            
+env.RELAY (AnimaRelay)      Durable Object      
+
+--dry-run: exiting now.

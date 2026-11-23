@@ -46,9 +46,31 @@
 
 也就是說：**CPU 版 ComfyUI 真的能在這個 workspace 上跑，而且 relay 一路收得到心跳。**
 
+### 官方怎麼說（重點）
+
+OpenAI 文件沒有用「暫停」這個詞，寫的是：
+
+> 「By default, a task's saved VM state is recoverable for up to seven days after you
+> last start a turn or resume the task.」
+> — *Cloud environments*, learn.chatgpt.com/docs/environments/cloud-environments
+
+同一頁的規格表：
+
+| ChatGPT 方案 | vCPU | 記憶體 | 磁碟 |
+|---|---:|---:|---:|
+| Plus / Edu Plus | 2 | 8 GiB | 8 GiB |
+| **Pro / Business / Enterprise** | **4** | **16 GiB** | **32 GiB** |
+| Edu / Edu Pro | 4 | 16 GiB | 32 GiB |
+
+你這台讀到 4 vCPU / 17.2 GB / 33.8 GB → 對應 **Pro 等級**（數字換算差異來自單位與系統保留）。
+
+**解讀**：這是「**七天內可恢復**」的保證，不是「**七天持續開機**」的保證。
+沒有 SLA 承諾 VM 一直跑；我這邊看到的 9.9 小時連續心跳是**觀察到的行為，不是合約**。
+
 ### 風險在哪
 
-1. **VM 跟著 Codex session 活**：session 結束、被歸檔、或平台回收，VM 就沒了 → agent 心跳停止 → relay 90 秒後排隊、300 秒後回 503
+1. **VM 狀態最多保留 7 天**（從你最後一次發話或恢復任務算起）；超過就沒了
+2. **沒有 uptime 保證**：平台隨時可能回收，agent 心跳一斷 → relay 90 秒後排隊、300 秒後回 503
 2. **沒有 GPU**：512×512 一張約 1–2 分鐘，1024 更久，而租約是 15 分鐘
 3. **磁碟只有 34 GB**：放不下多個 SDXL checkpoint，換模型要先清
 4. **無法 SSH 進去**（我這邊拿不到 shell），只能透過 relay API 觀察

@@ -24,7 +24,7 @@ python anima_client.py --api https://你的已驗證API網址 --key-file client.
 
 ## GitHub收件匣
 
-此選項待使用者確認是否建立私人repo，及主要送單裝置。它不需要公開VM埠、Cloudflare Token或Actions；
+客戶端與worker已實作，本機測試通過；遠端尚未啟用。現有GitHub連線建立私人repo回傳403，需帳號持有人先建立私人anima-vm-jobs儲存庫。它不需要公開VM埠、Cloudflare Token或Actions；
 任務由本機／GitHub UI送出，VM背景worker從合法GitHub API讀取，結果保存在私人結果分支。
 在repo、信任驗證及worker完成實測前，不宣稱此模式已啟用。
 
@@ -92,4 +92,4 @@ connection.json預設私人任務匣；不包含任何Token。GitHub模式的任
 
 雲端啟動按鈕只在connection.json填入codex_environment_id後啟用，還會檢查本機Codex CLI實際授權；
 它提交新Cloud Task，不是一般VM建立／喚醒API。沒有完成此設定時，介面明確顯示未設定，不會謊報VM已建立。
-本次沒有在Windows或macOS上執行測試；核心Python、HTTP介面與GitHub流程在雲端Linux驗證。
+本次沒有在Windows或macOS上執行測試；核心Python與本機HTTP介面在雲端Linux驗證；GitHub鎖定／任務格式有本機測試，真實遠端送單仍待私人repo建立後驗收。

@@ -1,0 +1,16 @@
+Anima 本機客戶端
+
+目前狀態：程式完成，本機測試通過；遠端尚未開通，不能立即生成。
+
+1. 安裝 Python 3.10+：https://www.python.org/downloads/
+2. 安裝 GitHub CLI：https://cli.github.com/
+3. Windows 雙擊 start-windows.bat；macOS/Linux 執行 bash start-mac-linux.sh。
+4. 在自己裝置的瀏覽器登入 GitHub，勿在聊天貼 Token。
+5. 遠端開通後，可送單、看資源快照，勾選自動下載取圖。
+
+尚需帳號 s9213712 在 https://github.com/new 建立 Private 的 anima-vm-jobs，先不加 README/License/.gitignore，再回覆已建立。
+現有整合沒有建立repo權限（403），接著還要驗證讀寫權限、推送程式與啟動VM worker。
+
+此客戶端不能建立或喚醒目前這台託管VM。VM停止時任務可留在GitHub，但不會生成。
+圖片會送到已授權私人GitHub儲存庫；模型在VM內執行。沒有啟用付費API。
+詳細操作及限制請看 README.md。

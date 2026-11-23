@@ -136,6 +136,12 @@ let cfg = { url: localStorage.getItem(LS.url) || (location.protocol==="https:"?l
 let jobs = JSON.parse(localStorage.getItem(LS.jobs) || "[]");
 let timer = null;
 
+// ---- 本機圖片快取（伺服器只保留 24h，DO 換實例也會清空）----
+function idb(){return new Promise((res,rej)=>{const r=indexedDB.open("anima",1);r.onupgradeneeded=()=>r.result.createObjectStore("images");r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
+async function idbGet(k){try{const db=await idb();return await new Promise((res,rej)=>{const q=db.transaction("images","readonly").objectStore("images").get(k);q.onsuccess=()=>res(q.result||null);q.onerror=()=>rej(q.error);});}catch(e){return null;}}
+async function idbPut(k,v){try{const db=await idb();await new Promise((res,rej)=>{const t=db.transaction("images","readwrite");t.objectStore("images").put(v,k);t.oncomplete=res;t.onerror=()=>rej(t.error);});}catch(e){}}
+async function idbDel(k){try{const db=await idb();await new Promise((res)=>{const t=db.transaction("images","readwrite");t.objectStore("images").delete(k);t.oncomplete=res;});}catch(e){}}
+
 function toast(msg, ms=6000){
   const t = $("toast"); t.textContent = msg; t.style.display = "block";
   clearTimeout(t._t); t._t = setTimeout(()=> t.style.display="none", ms);
@@ -206,22 +212,49 @@ function renderJob(j){
     el.appendChild(img);
     if(j._imgUrl){ img.src = j._imgUrl; }
     else {
-      api(`/v1/jobs/${j.id}/image`).then(r=>r.blob()).then(b=>{ j._imgUrl = URL.createObjectURL(b); img.src = j._imgUrl; }).catch(e=>{ img.remove(); });
+      idbGet(j.id).then(cached=>{
+        if(cached){ j._imgUrl = URL.createObjectURL(cached); img.src = j._imgUrl; return; }
+        api(`/v1/jobs/${j.id}/image`).then(r=>r.blob()).then(b=>{
+          idbPut(j.id,b);
+          j._imgUrl = URL.createObjectURL(b); img.src = j._imgUrl;
+        }).catch(()=>{ img.remove(); });
+      });
     }
   }
+  return el;
+}
+
+function renderExpired(id, blob){
+  const el = document.createElement("div");
+  el.className = "job";
+  el.innerHTML = `<div class="top"><div><span class="chip">已過期</span>
+    <span class="meta">伺服器紀錄已清除（保留 24 小時）</span></div>
+    <button class="ghost" data-del="${id}" style="padding:2px 10px">刪除</button></div>`;
+  if(blob){ const img=document.createElement("img"); img.className="out"; img.src=URL.createObjectURL(blob); el.appendChild(img); }
+  else { const p=document.createElement("div"); p.className="meta"; p.textContent="本機也沒有快取"; el.appendChild(p); }
+  el.querySelector("[data-del]").onclick = async () => { await idbDel(id); jobs = jobs.filter(x=>x!==id); localStorage.setItem(LS.jobs, JSON.stringify(jobs)); refreshJobs(); };
   return el;
 }
 
 async function refreshJobs(){
   const box = $("jobs");
   if(!jobs.length){ box.innerHTML = '<div class="meta">尚無任務。送出後會顯示在這裡。</div>'; return; }
+  const before = jobs.slice(0,12);
   box.innerHTML = "";
-  for(const id of jobs.slice(0,12)){
+  const stillThere = [];
+  for(const id of before){
     let j = null;
-    try { j = await (await api("/v1/jobs/"+id)).json(); } catch(e){ continue; }
+    try { j = await (await api("/v1/jobs/"+id)).json(); }
+    catch(e){
+      const blob = await idbGet(id);
+      box.appendChild(renderExpired(id, blob));
+      stillThere.push(id);
+      continue;
+    }
+    stillThere.push(id);
     box.appendChild(renderJob(j));
   }
-  jobs = jobs.filter(id => true);
+  jobs = [...stillThere, ...jobs.slice(12)];
   localStorage.setItem(LS.jobs, JSON.stringify(jobs));
 }
 

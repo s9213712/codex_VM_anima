@@ -10,7 +10,9 @@ function Run-Wrangler([string[]]$Arguments) {
 }
 try {
     if (-not (Get-Command node.exe -ErrorAction SilentlyContinue)) { throw 'Install Node.js LTS from https://nodejs.org/ then reopen PowerShell.' }
-    $Major = [int]((& node.exe -p 'process.versions.node.split(".")[0]') | Select-Object -Last 1)
+    $NodeVersion = (& node.exe --version | Select-Object -Last 1)
+    if ($LASTEXITCODE -ne 0 -or $NodeVersion -notmatch '^v(\d+)\.') { throw 'Cannot read Node.js version.' }
+    $Major = [int]$Matches[1]
     if ($Major -lt 22) { throw 'Node.js 22 or newer is required. Install the current LTS.' }
     Write-Host 'This updates your existing anima Worker and creates its SQLite Durable Object.'
     Write-Host 'It does not upgrade plans. Stop unless this account is Workers Free.'

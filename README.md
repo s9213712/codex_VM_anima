@@ -94,7 +94,8 @@ UI 提供：
 
    ```bash
    cd D:/anima-cloudflare-windows
-   K=$(tr -d '
+   K=$(tr -d '
+
 ' < anima-cloudflare/.private/client.key)
    npx --yes qrcode -o pair-qr.png -w 640 "https://<worker>.workers.dev/ui#key=$K"
    ```
@@ -247,6 +248,33 @@ GET {FALLBACK_URL}/healthz → {"ok":true}
 - 只有在 `agent_age > 300s` 時才會走 fallback；90–300 秒仍是排隊等 VM
 - fallback 任務在 UI 上會標「備援」，`/v1/jobs/{id}` 的 `backend` 欄位為 `fallback`
 - fallback 失敗會直接把任務標 FAILED，不會無限重試
+
+### 大圖（1920×1088）怎麼做
+
+Relay 驗證上限是 **1024 / 32 的倍數**（1080 不是 32 的倍數，最近合法值是 1088）。
+要 1080p 成品，請在 **VM 的 workflow 末端加放大節點**，不要放寬 relay：
+
+```json
+"9":  {"class_type": "ImageScale", "inputs": {"image": ["8", 0], "upscale_method": "lanczos", "width": 1920, "height": 1088, "crop": "disabled"}},
+"10": {"class_type": "SaveImage",  "inputs": {"images": ["9", 0], "filename_prefix": "anima"}}
+```
+
+或品質優先：`UpscaleModelLoader`（RealESRGAN_x4plus）+ `ImageUpscaleWithModel` + `ImageScale`。
+CPU 上 512² 生成約 1–2 分，放大到 1920×1088 約再加 20–40 秒，遠比直接生 2 MP 安全。
+
+### 歷史任務回 404
+
+兩個原因，屬正常行為：
+
+1. **保留 24 小時**：`DELETE FROM jobs WHERE created < now-86400000`
+2. **更換 Durable Object 實例**（`RELAY_INSTANCE` 版本號變更）會換到新的 SQLite 儲存，舊紀錄消失
+
+UI 會把完成圖快取在瀏覽器 IndexedDB，伺服器清掉後仍顯示「已過期」並可下載；
+不同裝置的快取各自獨立。
+
+### 觀測
+
+`wrangler.jsonc` 已開啟 `observability`（取樣 20%），可在 Cloudflare Dashboard → Workers → anima → Logs 查詢。
 
 ---
 

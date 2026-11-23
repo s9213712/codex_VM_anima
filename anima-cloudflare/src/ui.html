@@ -94,10 +94,11 @@
           <div>
             <label>尺寸</label>
             <select id="size">
-              <option value="256">256 × 256</option>
-              <option value="512" selected>512 × 512</option>
-              <option value="768">768 × 768</option>
-              <option value="1024">1024 × 1024</option>
+              <option value="512" selected>512 × 512（1:1）</option>
+              <option value="768">768 × 768（1:1）</option>
+              <option value="1024">1024 × 1024（1:1）</option>
+              <option value="1024x576">1024 × 576（16:9）</option>
+              <option value="768x432">768 × 432（16:9）</option>
               <option value="custom">自訂</option>
             </select>
           </div>
@@ -210,13 +211,17 @@ function renderJob(j){
     const img = document.createElement("img");
     img.className="out"; img.alt="生成結果";
     el.appendChild(img);
-    if(j._imgUrl){ img.src = j._imgUrl; }
+    const dl = document.createElement("a");
+    dl.textContent = "下載 PNG"; dl.className = "chip"; dl.style.cssText = "display:inline-block;margin-top:8px;text-decoration:none";
+    dl.download = j.id + ".png";
+    img.after(dl);
+    if(j._imgUrl){ img.src = j._imgUrl; dl.href = j._imgUrl; }
     else {
       idbGet(j.id).then(cached=>{
-        if(cached){ j._imgUrl = URL.createObjectURL(cached); img.src = j._imgUrl; return; }
+        if(cached){ j._imgUrl = URL.createObjectURL(cached); img.src = j._imgUrl; dl.href = j._imgUrl; return; }
         api(`/v1/jobs/${j.id}/image`).then(r=>r.blob()).then(b=>{
           idbPut(j.id,b);
-          j._imgUrl = URL.createObjectURL(b); img.src = j._imgUrl;
+          j._imgUrl = URL.createObjectURL(b); img.src = j._imgUrl; dl.href = j._imgUrl;
         }).catch(()=>{ img.remove(); });
       });
     }
@@ -263,8 +268,10 @@ async function submit(){
   if(!prompt){ toast("請先輸入提示詞"); return; }
   let w,$h;
   const sizeSel = $("size").value;
-  const width = sizeSel==="custom" ? +$("w").value : +sizeSel;
-  const height = sizeSel==="custom" ? +$("h").value : +sizeSel;
+  let width, height;
+  if(sizeSel==="custom"){ width=+$("w").value; height=+$("h").value; }
+  else if(sizeSel.includes("x")){ const [a,b]=sizeSel.split("x"); width=+a; height=+b; }
+  else { width=height=+sizeSel; }
   for(const v of [width,height]) if(v<128||v>1024||v%32){ toast("寬高必須是 128–1024 且為 32 的倍數"); return; }
   const body = { prompt, negative_prompt: $("neg").value, width, height, steps: +$("steps").value, seed: +$("seed").value };
   $("go").disabled = true;
@@ -312,7 +319,7 @@ $("go").onclick = submit;
 
 applyCfg();
 refresh();
-timer = setInterval(()=>{ if(cfg.key) refresh(); }, 4000);
+timer = setInterval(()=>{ if(cfg.key && !document.hidden) refresh(); }, 4000);
 </script>
 </body>
 </html>

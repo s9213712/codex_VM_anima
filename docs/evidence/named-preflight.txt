@@ -1,0 +1,1 @@
+BLOCKED: mount the Named Tunnel token as a secret file and set TUNNEL_TOKEN_FILE; do not paste it into chat

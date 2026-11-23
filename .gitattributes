@@ -1,0 +1,2 @@
+docs/evidence/*.log -whitespace
+docs/evidence/cloudflared-run-help.txt -whitespace

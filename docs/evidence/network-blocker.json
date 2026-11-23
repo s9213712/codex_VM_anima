@@ -1,0 +1,11 @@
+{
+  "observed_at": 1795429928.6886518,
+  "environment_revision": "21",
+  "quick_api_last_observed_status": 403,
+  "quick_api_last_observed_body": "Your request was blocked.",
+  "quick_api_last_check_time_utc": "2026-11-23 (earlier same environment revision; not retried after denial)",
+  "named_token_ready": false,
+  "public_url": null,
+  "raw_diagnostics_available": false,
+  "required_external_change": "platform-supported egress for Cloudflare Tunnel; then credential/hostname setup"
+}

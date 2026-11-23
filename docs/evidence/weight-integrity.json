@@ -1,0 +1,31 @@
+{
+  "revision": "073c3a9db359c31ad0e8aa268d15775473c2176c",
+  "completed_at": 1795429824.8987315,
+  "files": [
+    {
+      "file": "text_conditioner/diffusion_pytorch_model.safetensors",
+      "bytes": 269339400,
+      "sha256": "fdcf606524892e35b270b96fc8bbd8d77e615ab882675a049f6e7c2ff6b71da3"
+    },
+    {
+      "file": "text_encoder/model.safetensors",
+      "bytes": 1192133232,
+      "sha256": "75e8db94adb374b61baca3d898fc2c0d5086d20689a96d4e74576546433a0526"
+    },
+    {
+      "file": "tokenizer/tokenizer.json",
+      "bytes": 11422924,
+      "sha256": "476870a1f2fb6f6a2759a6ede2383bf9d5d738f17844563b65c91965b722ae09"
+    },
+    {
+      "file": "transformer/diffusion_pytorch_model.safetensors",
+      "bytes": 3912877104,
+      "sha256": "81dc5915fc3c3b170684534ca11ed6c535ddea5658793a801fac53b8d5281065"
+    },
+    {
+      "file": "vae/diffusion_pytorch_model.safetensors",
+      "bytes": 253806966,
+      "sha256": "0c8bc8b758c649abef9ea407b95408389a3b2f610d0d10fcb054fe171d0a8344"
+    }
+  ]
+}

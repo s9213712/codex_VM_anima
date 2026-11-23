@@ -1,0 +1,20 @@
+[project]
+name = "anima-cpu-server"
+version = "0.2.0"
+requires-python = ">=3.12"
+dependencies = [
+  "torch==2.15.0+cpu", "torchvision==0.29.2+cpu",
+  "diffusers @ https://github.com/huggingface/diffusers/archive/1dabc292d8413638cf0666cca6d7a6c2c765befa.tar.gz",
+  "transformers==5.23.0", "accelerate>=1.8,<2", "huggingface-hub>=0.35,<2",
+  "fastapi>=0.115,<1", "uvicorn>=0.34,<1", "pillow>=11", "psutil>=6",
+  "sentencepiece>=0.2", "protobuf>=5", "httpx>=0.28", "pytest>=8"
+]
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+[tool.pytest.ini_options]
+pythonpath = ["."]

@@ -1,0 +1,19 @@
+{
+  "checked_at": 1795430055.6910906,
+  "current_generation": {
+    "model": "circlestone-labs/Anima-Base-v1.0-Diffusers",
+    "revision": "073c3a9db359c31ad0e8aa268d15775473c2176c",
+    "device": "cpu",
+    "dtype": "bfloat16",
+    "elapsed_seconds": 161.6812076260003,
+    "rss_at_completion_bytes": 5954228224,
+    "width": 256,
+    "height": 256,
+    "steps": 8,
+    "seed": 42,
+    "sha256": "acb8548ab457ea3b62bbdabd966cdc682349aab7d0d7c665bfe33748bd577971"
+  },
+  "public_url": null,
+  "network_approved_by_owner": false,
+  "unit_tests": "5 passed; see tests.log"
+}

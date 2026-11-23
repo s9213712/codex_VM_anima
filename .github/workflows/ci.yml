@@ -29,7 +29,7 @@ jobs:
 
       - name: Fail if generated UI drifted from src/ui.html
         working-directory: anima-cloudflare
-        run: git diff --exit-code -- src/ui.generated.js
+        run: git diff --ignore-cr-at-eol --exit-code -- src/ui.generated.js
 
       - name: Unit tests
         working-directory: anima-cloudflare

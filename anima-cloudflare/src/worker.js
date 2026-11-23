@@ -59,7 +59,10 @@ export default {
   }
 };
 
+export { authenticate, bytes, bodyJSON, validJob, safeMetrics, publicJob, HttpError, json };
+
 export class AnimaRelay {
+
   constructor(ctx,env){
     this.ctx=ctx;this.env=env;this.sql=ctx.storage.sql;
     this.sql.exec("CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY,status TEXT NOT NULL,request_json TEXT NOT NULL,created INTEGER NOT NULL,started INTEGER,finished INTEGER,lease TEXT,lease_until INTEGER,error TEXT,metadata TEXT,image BLOB)");

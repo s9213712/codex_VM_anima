@@ -1,1 +1,14 @@
-{"name":"anima-https-relay","private":true,"type":"module","scripts":{"test":"node --test test/*.test.js"},"devDependencies":{"miniflare":"4.20260730.0","wrangler":"4.166.0"}}
+{
+  "name": "anima-https-relay",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "health": "node scripts/health.mjs",
+    "check": "npm test && npx wrangler deploy --dry-run"
+  },
+  "devDependencies": {
+    "miniflare": "4.20260730.0",
+    "wrangler": "4.166.0"
+  }
+}

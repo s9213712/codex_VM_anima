@@ -1,13 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import worker, { authenticate, bytes, validJob, safeMetrics, publicJob, AnimaRelayV2, agentGate, AGENT_SOFT_MS, AGENT_HARD_MS, LEASE_MS, PENDING_MAX_MS } from "../src/worker.js";
+import { authenticate, bytes, validJob, safeMetrics, publicJob, agentGate, AGENT_SOFT_MS, AGENT_HARD_MS, LEASE_MS, PENDING_MAX_MS } from "../src/logic.js";
 
 const GOOD = { prompt: "a cat", negative_prompt: "blurry", width: 512, height: 512, steps: 8, seed: 42 };
 const KEY = "k".repeat(44);
 
-test("worker exports the Durable Object class", () => {
-  assert.equal(typeof AnimaRelayV2, "function");
-  assert.equal(typeof worker.fetch, "function");
+test("logic module loads without the Worker runtime", () => {
+  assert.equal(typeof validJob, "function");
+  assert.equal(typeof agentGate, "function");
 });
 
 test("validJob accepts a complete job", () => {

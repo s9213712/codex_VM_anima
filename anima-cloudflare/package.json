@@ -3,9 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build:ui": "node scripts/build-ui.mjs",
     "test": "node --test test/*.test.js",
     "health": "node scripts/health.mjs",
-    "check": "npm test && npx wrangler deploy --dry-run"
+    "check": "node scripts/build-ui.mjs && npm test && npx wrangler deploy --dry-run",
+    "deploy": "node scripts/build-ui.mjs && npx wrangler deploy"
   },
   "devDependencies": {
     "miniflare": "4.20260730.0",

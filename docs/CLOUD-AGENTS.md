@@ -1,8 +1,12 @@
 # 用 Codex / Claude / Jules 的雲端 VM 建置本專案
 
-> 結論先講：**這三家的雲端 VM 都適合「改程式、跑測試、開 PR」，都不適合當 Anima 的出圖後端**
-> （沒有 GPU、VM 生命週期是分鐘到小時、會被回收）。
-> 要真正出圖，仍然需要你自己的機器或長期租用的 GPU VM（見 `docs/VM-SETUP.md`）。
+> **更正（2026-11-24 實測）**：先前寫「三家雲端 VM 都不能當出圖後端」是錯的。
+> 你的 Anima 目前**就跑在 Codex Cloud 的 session VM 上**，已連續運作 9.9 小時：
+> 4 vCPU（5 核可見）／17.2 GB RAM／33.8 GB 磁碟、CPU 版 ComfyUI + Anima Turbo v0.2（8 步）。
+>
+> 所以真正的判準不是「哪一家」，而是：**這台 VM 會不會在你不用它的時候被回收**。
+> Codex Cloud 的 workspace 會跟著 session 存活（可跑 daemon）；Claude cloud 閒置會暫停；
+> Jules 官方明寫 short-lived。
 
 ---
 
@@ -19,8 +23,8 @@
 | 密鑰 | Environment variables（直接注入）或 **HTTP secrets**（代理替換，程式只看到佔位符） | Environment variables（.env 格式）＋ network secrets | Configuration 內設定環境變數 |
 | 客製安裝 | `Install script` + `Start skill`，由 Codex 幫你寫並測試 | `Setup script`（新 session 開頭執行） | `Initial Setup` 腳本，按 **Run and Snapshot** 驗證並快照 |
 | 專案指示檔 | `AGENTS.md` | `CLAUDE.md`（不讀 AGENTS.md） | `AGENTS.md` / `README.md` |
-| GPU | **無** | **無** | **無** |
-| 能否常駐 daemon | 不行（task 結束就沒了） | 不行（閒置會暫停、可能被回收） | 不行（短命 VM） |
+| GPU | 無（但有 4 vCPU + 17 GB RAM，CPU 版 ComfyUI 可跑） | 無 | 無 |
+| 能否常駐 daemon | **可以**（實測 agent 連續心跳 9.9 小時） | 閒置暫停時會停；恢復後要重啟服務 | 不行（短命 VM） |
 | 最適合 | 有規模的 repo 改造、跑測試、發 PR | 同上，且能接 GitHub 開 PR | 同上，環境預裝最齊 |
 
 > 規格數字（vCPU/記憶體）三家都沒有寫進公開文件；社群回報 Codex Pro 約 4 vCPU / 16 GiB / 32 GiB 磁碟。
@@ -28,25 +32,32 @@
 
 ---
 
-## 2. 為什麼不能拿來跑 Anima 後端
+## 2. 實測：Codex Cloud VM 可以跑，但壽命不是你的
 
-`vm/agent.py` 的運作方式：
+2026-11-24 從 relay 的 `/healthz` 讀到的實際數據：
 
-1. 常駐，每 **10 秒**送一次心跳
-2. 每 2 秒 poll 一次 `POST /agent/claim`
-3. 領到任務後執行 ComfyUI，回報進度，15 分鐘租約內交件
+| 項目 | 數值 |
+|---|---|
+| agent 連續運作 | 9.9 小時（心跳 6 秒前） |
+| CPU | 4 vCPU 配額（5 核可見），使用率 0.2% |
+| 記憶體 | 17.2 GB（已用 5.4 GB） |
+| 磁碟 | 33.8 GB（已用 7.9 GB，剩 24.1 GB） |
+| 模型 | Anima Turbo v0.2 LoRA、8 步、guidance 1、RSS 4.9 GB |
 
-三個平台都會在這之前把 VM 停掉或回收：
+也就是說：**CPU 版 ComfyUI 真的能在這個 workspace 上跑，而且 relay 一路收得到心跳。**
 
-- **Codex**：task 結束 workspace 就結束
-- **Claude**：閒置幾分鐘 VM 暫停；被回收就重建（重建後 `/home/user/anima` 的安裝與暫存都沒了，除非寫進 setup script）
-- **Jules**：官方明寫「short-lived VM」
+### 風險在哪
 
-再加上**沒有 GPU**：SD 1.5 在 CPU 上 512×512 約 1–2 分鐘，放大到 1024 更久，而租約是 15 分鐘 —— 等於送出去也來不及。
+1. **VM 跟著 Codex session 活**：session 結束、被歸檔、或平台回收，VM 就沒了 → agent 心跳停止 → relay 90 秒後排隊、300 秒後回 503
+2. **沒有 GPU**：512×512 一張約 1–2 分鐘，1024 更久，而租約是 15 分鐘
+3. **磁碟只有 34 GB**：放不下多個 SDXL checkpoint，換模型要先清
+4. **無法 SSH 進去**（我這邊拿不到 shell），只能透過 relay API 觀察
 
-**所以正確用法是**：用它們維護 relay 與工具鏈，用你自己的機器出圖。
+### 所以該怎麼設計
 
----
+- 把 VM 當**可拋棄的執行者**，不要當唯一後端 → 這正是 `FALLBACK_URL` 的用途
+- 模型與 workflow 要**可重建**（放 repo 或物件儲存，不要只存在 VM 磁碟）
+- 監控交給 relay 的 `/healthz` 與守門 cron（每 10 分鐘，異常才響）
 
 ## 3. 三個平台各自的建置步驟
 
@@ -136,4 +147,5 @@ python3 vm/agent.py --relay https://anima.s92137123.workers.dev \
 | 大改 relay、需要長時間迭代與多檔案重構 | **Codex Cloud**（環境快照 + 權限控制最完整） |
 | 已經在用 Claude、想直接開 PR | **Claude Code cloud** |
 | 需要很多預裝工具鏈（C/C++、Docker、多語言） | **Jules**（預裝最齊，snapshot 免重裝） |
-| 需要 GPU 出圖 | **都不行** → 自有機器或 Runpod（見 `docs/VM-SETUP.md`、`docs/CODEX-TASKS.md`） |
+| 想把 VM 當主力出圖機 | **Codex Cloud workspace**（已驗證可跑，但壽命取決於 session） |
+| 想要穩定長期出圖 | 自有機器 / Runpod / GCE GPU VM（見 `docs/VM-SETUP.md`、`docs/GEMINI-VM.md`） |

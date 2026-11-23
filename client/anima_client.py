@@ -3,6 +3,11 @@
 import argparse,hashlib,json,sys,time,urllib.error,urllib.parse,urllib.request,uuid
 from pathlib import Path
 
+try:
+    from .github_transport import GitHub,GitHubError
+except ImportError:
+    from github_transport import GitHub,GitHubError
+
 class ClientError(RuntimeError):pass
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self,req,fp,code,msg,headers,newurl):return None
@@ -56,13 +61,13 @@ def wait(client,ident,timeout=1200,interval=10):
     deadline=time.monotonic()+timeout
     while time.monotonic()<deadline:
         state=client.status(ident);print('STATUS',state.get('status','PENDING'),flush=True)
-        if state.get('status')=='FAILED':raise ClientError(state.get('error') or 'Task failed')
+        if state.get('status') in ('FAILED','BLOCKED'):raise ClientError(state.get('error') or 'Task failed')
         if state.get('status')=='SUCCEEDED':return state
         time.sleep(interval)
     raise ClientError('Wait timed out; keep your task ID and query status later')
 
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--api',required=True);p.add_argument('--key-file',type=Path,required=True);p.add_argument('--local-test',action='store_true')
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--api');p.add_argument('--repo');p.add_argument('--key-file',type=Path);p.add_argument('--local-test',action='store_true')
     sub=p.add_subparsers(dest='command',required=True)
     submit=sub.add_parser('submit');submit.add_argument('--prompt');submit.add_argument('--prompt-file',type=Path);submit.add_argument('--size',type=int,default=256);submit.add_argument('--steps',type=int,default=8);submit.add_argument('--seed',type=int,default=42);submit.add_argument('--wait',action='store_true');submit.add_argument('--output',default='result.png')
     resources=sub.add_parser('resources');resources.add_argument('--watch',type=int,default=0,help='Refresh seconds, 1..60; omit for one snapshot');resources.add_argument('--duration',type=int,default=10800,help='Maximum watch lifetime, 1..10800 seconds')
@@ -70,7 +75,11 @@ def main():
     download=sub.add_parser('download');download.add_argument('id');download.add_argument('--output',required=True)
     a=p.parse_args()
     try:
-        client=API(a.api,a.key_file.read_text().strip(),a.local_test)
+        config_file=Path(__file__).with_name('connection.json');config=json.loads(config_file.read_text()) if config_file.exists() else {}
+        repo=a.repo or (config.get('repo') if not a.api else None)
+        if repo:client=GitHub(repo)
+        elif a.api and a.key_file:client=API(a.api,a.key_file.read_text().strip(),a.local_test)
+        else:raise ClientError('Configure a private repository, or provide --api and --key-file')
         if a.command=='resources':
             if not 0<=a.watch<=60:raise ClientError('--watch must be 0..60 seconds')
             if not 1<=a.duration<=10800:raise ClientError('--duration must be 1..10800 seconds')
@@ -88,5 +97,5 @@ def main():
         if a.wait:
             state=wait(client,job['id']);print(save_image(client.download(job['id']),a.output,(state.get('metadata') or {}).get('sha256')))
     except KeyboardInterrupt:return
-    except (ClientError,OSError) as e:print('ERROR:',str(e),file=sys.stderr);raise SystemExit(2)
+    except (ClientError,GitHubError,OSError) as e:print('ERROR:',str(e),file=sys.stderr);raise SystemExit(2)
 if __name__=='__main__':main()

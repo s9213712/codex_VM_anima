@@ -69,3 +69,27 @@ Cloud Task會使用你的原生Codex額度，剩餘額度未知；不自動購�
 Windows的可選派發工具要求官方原生codex.exe；沒有在Windows上實測，不宣稱跨平台完整驗收。
 
 完整「建立環境／啟動 → 送單 → 取圖」一鍵流程尚未完成。送單、下載、資源查詢均需先接上已授權的外部收件方式。
+
+## 完整本機送單介面（GitHub模式）
+
+需要Python 3.10以上與官方GitHub CLI（https://cli.github.com/），本機不裝模型。
+Windows雙擊start-windows.bat；macOS／Linux在終端執行 ./start-mac-linux.sh。
+首次GitHub登入在你自己的裝置及瀏覽器完成，不在聊天貼Token。請登入可存取connection.json所列私人repo的帳號。
+啟動後會打開本機瀏覽器介面：送單、查詢、圖片預覽、自動下載、VM資源快照。
+瀏覽器若阻擋自動下載，使用頁面的下載按鈕。關掉介面之後請保留任務編號，可稍後查詢。
+
+命令列也可以不帶--api：
+
+```bash
+python anima_client.py submit --prompt "sunrise over a mountain lake" --wait --output lake.png
+python anima_client.py status ISSUE_NUMBER
+python anima_client.py download ISSUE_NUMBER --output lake.png
+python anima_client.py resources --watch 30 --duration 600
+```
+
+connection.json預設私人任務匣；不包含任何Token。GitHub模式的任務編號是Issue number，不是HTTP API的UUID。
+手機可直接用私人repo的Generate an image Issue Form送單，結果連結在完成的Issue內；不需要聊天，也不需要在手機跑Python。
+
+雲端啟動按鈕只在connection.json填入codex_environment_id後啟用，還會檢查本機Codex CLI實際授權；
+它提交新Cloud Task，不是一般VM建立／喚醒API。沒有完成此設定時，介面明確顯示未設定，不會謊報VM已建立。
+本次沒有在Windows或macOS上執行測試；核心Python、HTTP介面與GitHub流程在雲端Linux驗證。

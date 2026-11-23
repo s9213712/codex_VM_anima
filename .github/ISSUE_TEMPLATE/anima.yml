@@ -1,0 +1,40 @@
+name: Generate an image
+description: Submit an image task for the Anima VM worker
+title: "Image request"
+labels: [anima-job]
+body:
+  - type: textarea
+    id: prompt
+    attributes:
+      label: Prompt
+      description: Image description, not code or commands
+    validations:
+      required: true
+  - type: textarea
+    id: negative
+    attributes:
+      label: Negative prompt
+      value: low quality, blurry
+  - type: dropdown
+    id: size
+    attributes:
+      label: Size
+      options: ['128', '256', '384', '512']
+      default: 1
+    validations:
+      required: true
+  - type: dropdown
+    id: steps
+    attributes:
+      label: Steps
+      options: ['4', '8', '12', '16', '20']
+      default: 1
+    validations:
+      required: true
+  - type: input
+    id: seed
+    attributes:
+      label: Seed
+      value: '42'
+    validations:
+      required: true

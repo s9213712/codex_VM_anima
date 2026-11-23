@@ -3,6 +3,11 @@
 // 用法：node scripts/check-secrets.mjs
 import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";
+import { chdir } from "node:process";
+
+// 不論從哪個子目錄執行，都切到 repo 根目錄再檢查
+const root = execSync("git rev-parse --show-toplevel", { encoding: "utf8" }).trim();
+chdir(root);
 
 const FORBIDDEN_TRACKED = [
   /(^|\/)\.private\//,

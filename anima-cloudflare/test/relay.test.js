@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { authenticate, bytes, validJob, safeMetrics, publicJob, agentGate, fallbackDecision, AGENT_SOFT_MS, AGENT_HARD_MS, LEASE_MS, PENDING_MAX_MS } from "../src/logic.js";
+import { authenticate, bytes, validJob, safeMetrics, publicJob, agentGate, fallbackDecision, RETENTION_MS, AGENT_SOFT_MS, AGENT_HARD_MS, LEASE_MS, PENDING_MAX_MS } from "../src/logic.js";
 
 const GOOD = { prompt: "a cat", negative_prompt: "blurry", width: 512, height: 512, steps: 8, seed: 42 };
 const KEY = "k".repeat(44);
@@ -121,4 +121,8 @@ test("publicJob exposes the backend that handled the job", () => {
   const base = { id: "a", status: "SUCCEEDED", request_json: JSON.stringify(GOOD), created: 1, started: 2, finished: 3, error: null, metadata: null };
   assert.equal(publicJob(base).backend, "primary");
   assert.equal(publicJob({ ...base, backend: "fallback" }).backend, "fallback");
+});
+
+test("retention window is 7 days", () => {
+  assert.equal(RETENTION_MS, 7 * 24 * 60 * 60 * 1000);
 });

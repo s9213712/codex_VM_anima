@@ -1,5 +1,5 @@
 import UI_HTML from "./ui.generated.js";
-import { ID, fallbackDecision, FALLBACK_TIMEOUT_MS, HttpError, json, authenticate, bytes, bodyJSON, validJob, safeMetrics, publicJob, agentGate, AGENT_SOFT_MS, AGENT_HARD_MS, LEASE_MS, PENDING_MAX_MS } from "./logic.js";
+import { ID, RETENTION_MS, fallbackDecision, FALLBACK_TIMEOUT_MS, HttpError, json, authenticate, bytes, bodyJSON, validJob, safeMetrics, publicJob, agentGate, AGENT_SOFT_MS, AGENT_HARD_MS, LEASE_MS, PENDING_MAX_MS } from "./logic.js";
 
 export class AnimaRelayV2 {
 
@@ -14,7 +14,7 @@ export class AnimaRelayV2 {
   async fetch(request){
     try{
       const now=Date.now(),path=new URL(request.url).pathname,method=request.method;
-      this.sql.exec("DELETE FROM jobs WHERE created < ?",now-86400000);
+      this.sql.exec("DELETE FROM jobs WHERE created < ?",now-RETENTION_MS);
       // 代理離線時卡住的任務：PENDING 超時即失敗，避免客戶端無限輪詢與配額浪費
       this.sql.exec("UPDATE jobs SET status='FAILED',finished=?,error='Agent offline before claim' WHERE status='PENDING' AND created < ?",now,now-PENDING_MAX_MS);
       this.sql.exec("DELETE FROM meta WHERE key LIKE 'progress:%' AND substr(key,10) NOT IN (SELECT id FROM jobs)");
@@ -54,7 +54,20 @@ export class AnimaRelayV2 {
         this.sql.exec("INSERT INTO jobs(id,status,request_json,created,backend) VALUES(?,'PENDING',?,?,'primary')",id,JSON.stringify(job),now);
         return json({id,status:"PENDING",backend:"primary",status_url:`/v1/jobs/${id}`,queued_while_agent_offline:gate==="queue"},202);
       }
+      if(path==="/v1/jobs" && method==="GET"){
+        const u=new URL(request.url);
+        const limit=Math.min(50,Math.max(1,parseInt(u.searchParams.get("limit")||"20",10)||20));
+        const rows=this.rows("SELECT * FROM jobs ORDER BY created DESC LIMIT ?",limit);
+        return json({jobs:rows.map(publicJob),retention_days:Math.round(RETENTION_MS/86400000),count:rows.length});
+      }
       let match=path.match(new RegExp(`^/v1/jobs/(${ID})(/image)?$`));
+      if(match && method==="DELETE"){
+        const row=this.rows("SELECT * FROM jobs WHERE id=?",match[1])[0];
+        if(!row)throw new HttpError(404,"Job not found");
+        if(row.status!=="PENDING")throw new HttpError(409,"Only queued jobs can be cancelled");
+        this.sql.exec("UPDATE jobs SET status='FAILED',finished=?,error='已取消' WHERE id=?",Date.now(),match[1]);
+        return json({id:match[1],status:"FAILED",cancelled:true});
+      }
       if(match && method==="GET"){
         const row=this.rows("SELECT * FROM jobs WHERE id=?",match[1])[0];if(!row)throw new HttpError(404,"Job not found");
         if(match[2]){
@@ -145,7 +158,7 @@ export default {
         return json({build:"v2-liveness",service:"Anima HTTPS image-job relay",authentication:"Bearer required",ui:"/ui",docs:"POST /v1/generations, then poll returned status_url"});
       }
       await authenticate(request,path.startsWith("/agent/")?env.AGENT_KEY:env.CLIENT_KEY);
-      return await env.RELAY.get(env.RELAY.idFromName(env.RELAY_INSTANCE || "single-approved-image-worker-v3")).fetch(request);
+      return await env.RELAY.get(env.RELAY.idFromName(env.RELAY_INSTANCE || "single-approved-image-worker-v4")).fetch(request);
     }catch(e){return json({error:e instanceof HttpError?e.message:"Relay temporarily unavailable"},e instanceof HttpError?e.status:503);}
 
   }

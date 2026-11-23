@@ -3,6 +3,7 @@ const JSON_HEADERS = {"Content-Type":"application/json; charset=utf-8","Cache-Co
 // 代理存活與任務逾時策略（毫秒）
 const AGENT_SOFT_MS=90000;      // 超過 90 秒沒心跳：仍收單，但標記等待代理
 const AGENT_HARD_MS=300000;     // 超過 5 分鐘：直接拒絕新單
+const RETENTION_MS=7*24*60*60*1000; // 任務保留 7 天
 const LEASE_MS=900000;          // 15 分鐘租約（原本 35 分鐘）
 const PENDING_MAX_MS=600000;    // 卡在 PENDING 超過 10 分鐘 → FAILED
 function agentGate(ageMs){
@@ -68,4 +69,4 @@ function publicJob(row){return {id:row.id,status:row.status,backend:row.backend|
 
 
 export { ID, fallbackDecision, FALLBACK_TIMEOUT_MS, JSON_HEADERS, HttpError, json, authenticate, bytes, bodyJSON, validJob, safeMetrics, publicJob, agentGate,
-  AGENT_SOFT_MS, AGENT_HARD_MS, LEASE_MS, PENDING_MAX_MS };
+  AGENT_SOFT_MS, AGENT_HARD_MS, LEASE_MS, PENDING_MAX_MS, RETENTION_MS };

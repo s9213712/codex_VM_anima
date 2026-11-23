@@ -209,7 +209,14 @@ function renderJob(j){
     ${j.metadata?`<div class="meta">${[j.metadata.engine,j.metadata.model,j.metadata.duration_seconds?j.metadata.duration_seconds+"s":""].filter(Boolean).join(" · ")}</div>`:""}
     ${j.status==="RUNNING"&&prog?`<div class="bar"><i style="width:${pct}%"></i></div><div class="meta">${stageMap[prog.stage]||prog.stage} ${prog.step}/${prog.total} · ${prog.elapsed_seconds?.toFixed(1)}s</div>`:""}
     ${j.error?`<div class="meta err">${j.error}</div>`:""}
+    ${j.status==="PENDING"?'<button class="ghost" data-cancel="'+j.id+'" style="padding:2px 10px;margin-top:8px">取消</button>':""}
   `;
+  const cancelBtn = el.querySelector("[data-cancel]");
+  if(cancelBtn) cancelBtn.onclick = async () => {
+    cancelBtn.disabled = true;
+    try { await api("/v1/jobs/"+j.id, { method:"DELETE" }); await refreshJobs(); }
+    catch(e){ toast(e.message); cancelBtn.disabled = false; }
+  };
   if(j.status==="SUCCEEDED"){
     const img = document.createElement("img");
     img.className="out"; img.alt="生成結果";
@@ -246,6 +253,21 @@ function renderExpired(id, blob){
 
 async function refreshJobs(){
   const box = $("jobs");
+  let server = null;
+  try { server = (await (await api("/v1/jobs?limit=20")).json()).jobs; } catch(e) { server = null; }
+
+  if(server){
+    const ids = server.map(j => j.id);
+    jobs = [...ids, ...jobs.filter(id => !ids.includes(id))].slice(0, 40);
+    localStorage.setItem(LS.jobs, JSON.stringify(jobs));
+    box.innerHTML = "";
+    if(!server.length) box.innerHTML = '<div class="meta">尚無任務。送出後會顯示在這裡。</div>';
+    for(const j of server) box.appendChild(renderJob(j));
+    const localOnly = jobs.filter(id => !ids.includes(id)).slice(0, 12);
+    for(const id of localOnly){ const blob = await idbGet(id); box.appendChild(renderExpired(id, blob)); }
+    return;
+  }
+
   if(!jobs.length){ box.innerHTML = '<div class="meta">尚無任務。送出後會顯示在這裡。</div>'; return; }
   const before = jobs.slice(0,12);
   box.innerHTML = "";

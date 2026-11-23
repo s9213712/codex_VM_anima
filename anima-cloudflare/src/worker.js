@@ -136,7 +136,10 @@ export default {
   async fetch(request,env){
     try{
       const path=new URL(request.url).pathname;
-      if(path==="/ui" && request.method==="GET")return new Response(UI_HTML,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});
+      if((path==="/ui"||path==="/ui/"||path==="/index.html") && request.method==="GET"){
+        if(path!=="/ui")return Response.redirect(new URL("/ui",request.url).toString(),308);
+        return new Response(UI_HTML,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});
+      }
       if(path==="/" && request.method==="GET"){
         if((request.headers.get("Accept")||"").includes("text/html"))return new Response(UI_HTML,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});
         return json({build:"v2-liveness",service:"Anima HTTPS image-job relay",authentication:"Bearer required",ui:"/ui",docs:"POST /v1/generations, then poll returned status_url"});

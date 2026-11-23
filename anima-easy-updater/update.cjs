@@ -1,6 +1,6 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),cp=require('node:child_process'),readline=require('node:readline/promises');
-const ROOT=__dirname, VERSION='2026.11.24-relay2';
+const ROOT=__dirname, VERSION='2026.11.24-relay3';
 function hash(b){return crypto.createHash('sha256').update(b).digest('hex')}
 function readJSON(p){return JSON.parse(fs.readFileSync(p,'utf8').replace(/^\uFEFF/,''))}
 function validateRoot(root){

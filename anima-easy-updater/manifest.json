@@ -1,5 +1,5 @@
 {
-  "version": "2026.11.24-relay2",
+  "version": "2026.11.24-relay3",
   "files": {
     "client/anima_client.py": "40046386a408ca7a9c59390e1efd615376f91a64037f56e7b0a3de246adf71ab",
     "client/cloud_task.py": "1d45cafe60060e9d7c1ce33948803ee2fcf94c20c3857517d6d22d48098ad729",
@@ -10,15 +10,16 @@
     "client/start-windows.bat": "04467c81e4aca552b9d9c61c0a00347f209c0b6128024720b4819450bd10d859",
     "relay/src/worker.js": "a4bd088081cf5f3237572c2a5c54fe15fff1a4ac2ea33765b5136c50a1e22f4c",
     "relay/src/logic.js": "ce12ec9c0aeb9eb82de351347af689ddde5ef3128327475e6411623a84538b31",
-    "relay/src/ui.html": "caf24c0f9e468567a2513147d49610feeefc8de413f66a355a0003d120618546",
-    "relay/src/ui.generated.js": "6d15468dbd8fd2337cc575ad5cf5b361d40f6cc68a8fcad2ec56a9e8bda59e0f",
-    "relay/package.json": "7f472f8cc6654ede56500f9a7dba5bb226cef16bb0ae9c218cb75e54b30c75c8",
+    "relay/src/ui.html": "02641c642e65360246f392de9a8b80c42c8e0d79acd1902cb339139fc7383ea8",
+    "relay/src/ui.generated.js": "93ff150a347a80f5645d88b2a8eab70cf15d4f528f519b3b8ef1b285147f05ac",
+    "relay/package.json": "286f74197320cb07b3ee12588c8346c1b7818c120a30f301356062f9fa08cf33",
     "relay/package-lock.json": "b113f80de8bc3a6b40ab949f2bd3be4f00b27075d3664d2506dcdc66ac9f4fe7",
     "relay/wrangler.jsonc": "0785c449292d5afa10c4122a10721ea86fc46970152201633330279e7092787c",
-    "relay/test/relay.test.js": "ec26061618c80949bd63793621568b0e3e668db4ae98edbbbc46efa26ed5b6f2",
-    "relay/scripts/build-ui.mjs": "c5b2116a24b86698309b01c761d0c9f2652166f4fb693c1cfb8bfcfe5039a927",
+    "relay/test/relay.test.js": "27714b4e920796af075efa027c08b74933c4b91a46dadca300f8877523b76595",
+    "relay/scripts/build-ui.mjs": "1fc84152b8f441607ccef932b23dd16cd9a2e56d869bbab3ee74713a9d7aabd3",
     "relay/scripts/health.mjs": "df33e447228a2a975e3725ec42816760305ee1a13926b5981cc4a2cb8b87df63",
-    "relay/vm/agent.py": "4ea057027a878fcdd5860f0f35d3060ee879f8626f576efc0e3be2d74df6662c",
+    "relay/README.txt": "ca140266cb614b80f166ff052f41dc434d8e05b3e96e6b2740284bb9f26824bd",
+    "relay/vm/agent.py": "91620c99cee5d0899622bad3e35e84fd3d3f95b615a24906e28ca2f694cc3700",
     "relay/bridge/comfy_bridge.py": "31a7c396b13904b4aafa3fd047239efcda43447e35ea07fc8c9028f094346105"
   }
 }

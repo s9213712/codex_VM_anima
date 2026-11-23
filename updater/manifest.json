@@ -1,15 +1,16 @@
 {
-  "version": "2026.11.23-turbo8",
+  "version": "2026.11.23-history",
   "files": {
-    "client/anima_client.py": "40046386a408ca7a9c59390e1efd615376f91a64037f56e7b0a3de246adf71ab",
+    "client/anima_client.py": "5adee14e896a41aa5851e4d1e557142deeb7e372eace5ea3545fc4c4f4fcbae3",
     "client/cloud_task.py": "1d45cafe60060e9d7c1ce33948803ee2fcf94c20c3857517d6d22d48098ad729",
-    "client/dashboard.html": "cb047a77198b183084a5b58c46d57af963af2d1b97a9509d162e83716aac1bfe",
-    "client/dashboard.py": "19a9d99ca8b15238de8ac3b0788d9c8ffaf2b6a050ca6a05e329d7d1f4724238",
+    "client/dashboard.html": "53d88e44a698271752dd9203bcbd053b0c8e56b196e5f518c2c16bdf85e788c3",
+    "client/dashboard.py": "418a6b3c506842a9da4cdb2e1085387b2117cf6ac0b16e7545280afe6b4e003a",
     "client/github_transport.py": "a8bf58bac21a93744f4fbd6ebf50a79812fc10ade416f188b26b7742427e7af7",
-    "client/installed-version.json": "f7ffc9e8787e1988984f88ee76fc04b1b25dc6d85215f9bdfa8258c7ae2b2fc9",
+    "client/history.py": "1ea261c56caa4c474fafdf9f7f2ee8d41eaacf69faedce999652040733900a4f",
+    "client/installed-version.json": "5c0bff081c4ae4e73649f916fcb9dc475103da969622ce791aa94d3d21d34030",
     "client/start-windows.bat": "04467c81e4aca552b9d9c61c0a00347f209c0b6128024720b4819450bd10d859",
     "relay/package-lock.json": "b113f80de8bc3a6b40ab949f2bd3be4f00b27075d3664d2506dcdc66ac9f4fe7",
     "relay/package.json": "7cc738ceebc65888a1f2136e892c6c974a1a2cdb8f594cdd60953024b7dc5efb",
-    "relay/src/worker.js": "34aef2cb6cd3da649dd0a3dfc0e677c9b11c047d437ac6ac8946b5d00f2225a5"
+    "relay/src/worker.js": "22e4eb2cccbabbf774e897b5092f3ccb15c5a47291ffeea0a26dbf7d5592f44b"
   }
 }

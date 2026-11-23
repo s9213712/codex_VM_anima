@@ -1,4 +1,4 @@
-Anima simple updater — 2026.11.23-turbo8
+Anima simple updater — 2026.11.23-history
 
 1. Close the old client PowerShell/console window. Do not stop the VM.
 2. Extract this ZIP anywhere. Double-click Update-Anima.bat.
@@ -29,3 +29,6 @@ Verified on Linux: package hashes, apply/backup/rollback, preserving fixture
 credentials and connection settings, wrong-folder rejection, JS syntax.
 Windows folder picker and real Wrangler deployment still require owner test.
 No paid plan upgrade, VM creation, or VM wake action is implemented.
+
+History update: cloud order list, search/filter, lazy previews and parameter reuse.
+Updates preserve history-data. Select mode2 to deploy the history API too.

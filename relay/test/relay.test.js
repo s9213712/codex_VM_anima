@@ -73,3 +73,15 @@ test('rectangular large jobs expose only authenticated lease progress',()=>harne
  assert.equal((await req(path,{method:'POST',key:AGENT,headers:{'X-Lease-Token':lease.lease},body:JSON.stringify({...data,step:5})})).status,422);
  assert.equal((await submit(req,{prompt:'x',width:1056})).status,422);
 }));
+
+test('authenticated history lists existing orders and excludes leases and blobs',()=>harness(async req=>{
+ assert.equal((await req('/v1/jobs',{key:''})).status,401);
+ assert.equal((await req('/v1/jobs',{key:AGENT})).status,401);
+ const first=await (await submit(req,{prompt:'history first',width:768,height:512})).json();
+ await submit(req,{prompt:'history second'});
+ await claim(req);
+ const r=await req('/v1/jobs');assert.equal(r.status,200);const list=await r.json();
+ assert.equal(list.jobs.length,2);assert.equal(list.retention_seconds,86400);
+ const row=list.jobs.find(j=>j.id===first.id);assert.equal(row.request.width,768);assert.equal(row.status,'RUNNING');
+ assert.equal('lease' in row,false);assert.equal('image' in row,false);assert.equal('progress' in row,false);
+}));

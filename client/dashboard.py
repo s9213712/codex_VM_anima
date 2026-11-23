@@ -4,16 +4,20 @@ import argparse,json,os,secrets,shutil,subprocess,sys,tempfile,threading,time,ur
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from pathlib import Path
 try:
+    from .history import History
     from .anima_client import API,ClientError,params
     from .github_transport import GitHub,GitHubError,issue_id
 except ImportError:
+    from history import History
     from anima_client import API,ClientError,params
     from github_transport import GitHub,GitHubError,issue_id
 
 class LocalServer(ThreadingHTTPServer):
     daemon_threads=True
-    def __init__(self,address,client,config):
+    def __init__(self,address,client,config,history_root=None):
         super().__init__(address,Handler);self.client=client;self.config=config;self.nonce=secrets.token_urlsafe(32)
+        namespace=config.get('api') or config.get('repo','unconfigured')
+        self.history=History(history_root or Path(__file__).with_name('history-data'),namespace)
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self,*args):pass
@@ -37,13 +41,46 @@ class Handler(BaseHTTPRequestHandler):
         if not self.authorized():return
         try:
             if path=='/api/resources':self.send_data(self.server.client.resources());return
+            if path=='/api/history':
+                warning=None;remote_ids=set();remote_rows=[]
+                try:
+                    if not hasattr(self.server.client,'history'):raise ClientError('Remote history is not supported by this backend')
+                    data=self.server.client.history()
+                    remote_rows=data.get('jobs',[])
+                    for state in remote_rows:
+                        if self.server.history.remember(state) is False:warning='Local history reached its 1000-record limit; new cloud jobs are visible but not archived'
+                        remote_ids.add(str(state['id']))
+                except (ClientError,GitHubError,OSError,ValueError) as error:warning=str(error)
+                merged={str(row['id']):row for row in self.server.history.list()}
+                merged.update({str(row['id']):row for row in remote_rows})
+                def timestamp(row):
+                    value=row.get('created') or row.get('started') or 0
+                    return value/1000 if value>1e12 else value
+                rows=sorted(merged.values(),key=timestamp,reverse=True)[:200]
+                for row in rows:
+                    row['local_snapshot']=str(row['id']) not in remote_ids
+                    row['preview_cached']=self.server.history.has_image(row['id'])
+                self.send_data({'jobs':rows,'warning':warning,'remote_retention_seconds':86400,'local_image_limit_bytes':100*1024*1024});return
             if path=='/api/config':
                 self.send_data({'backend':self.server.config.get('backend'),'repo':self.server.config.get('repo'),
                   'cloud_start_configured':bool(self.server.config.get('codex_environment_id')),'vm_create_supported':False});return
             if path.startswith('/api/jobs/'):
                 pieces=path.removeprefix('/api/jobs/').split('/');ident=pieces[0]
-                if len(pieces)==1:self.send_data(self.server.client.status(ident));return
-                if len(pieces)==2 and pieces[1]=='image':self.send_data(self.server.client.download(ident),mime='image/png');return
+                if len(pieces)==1:
+                    try:
+                        state=self.server.client.status(ident);self.server.history.remember(state)
+                    except (ClientError,GitHubError,OSError) as error:
+                        state=self.server.history.get(ident)
+                        if not state:raise
+                        state={**state,'local_snapshot':True,'history_warning':str(error)}
+                    self.send_data(state);return
+                if len(pieces)==2 and pieces[1]=='image':
+                    data=self.server.history.image(ident)
+                    if data is None:
+                        data=self.server.client.download(ident)
+                        state=self.server.history.get(ident) or {}
+                        self.server.history.save_image(ident,data,(state.get('metadata') or {}).get('sha256'))
+                    self.send_data(data,mime='image/png');return
             self.send_data({'error':'Not found'},404)
         except (ClientError,GitHubError,OSError,ValueError) as e:self.send_data({'error':str(e)},502)
     def do_POST(self):
@@ -54,7 +91,7 @@ class Handler(BaseHTTPRequestHandler):
             data=json.loads(self.rfile.read(length))
             if self.path=='/api/submit':
                 request=params(data.get('prompt'),negative_prompt=data.get('negative_prompt','low quality, blurry'),size=int(data.get('size',256)),width=int(data.get('width',data.get('size',256))),height=int(data.get('height',data.get('size',256))),steps=int(data.get('steps',8)),seed=int(data.get('seed',42)))
-                self.send_data(self.server.client.submit(request),202);return
+                state=self.server.client.submit(request);self.server.history.remember({**state,'request':request});self.send_data(state,202);return
             if self.path=='/api/cloud-task':
                 env=self.server.config.get('codex_environment_id','')
                 if not env:raise ClientError('No published Codex Cloud environment configured; this is not a VM wake API')

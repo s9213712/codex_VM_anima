@@ -82,6 +82,11 @@ export class AnimaRelay {
         if(!agent?.system)throw new HttpError(503,"No authenticated VM resource snapshot available yet");
         return json({...agent.system,snapshot_received_at:agent.observed_at,snapshot_age_seconds:agent.system.sampled_at===null?null:Math.max(0,(now/1000)-agent.system.sampled_at),agent_recent:now-agent.observed_at<60000});
       }
+      if(path==="/v1/jobs" && method==="GET"){
+        // Never include image blobs, leases or raw progress logs in the list.
+        const rows=this.rows("SELECT id,status,request_json,created,started,finished,error,metadata FROM jobs ORDER BY created DESC,id DESC LIMIT 50");
+        return json({jobs:rows.map(publicJob),retention_seconds:86400});
+      }
       if(path==="/v1/generations" && method==="POST"){
         const job=validJob(await bodyJSON(request));
         const active=this.rows("SELECT count(*) AS n FROM jobs WHERE status IN ('PENDING','RUNNING')")[0].n;

@@ -47,6 +47,7 @@ class API:
                 return content if binary else json.loads(content)
         except urllib.error.HTTPError as e:raise ClientError('API HTTP '+str(e.code)) from None
     def submit(self,data):return self.request('/v1/generations',data)
+    def history(self):return self.request('/v1/jobs')
     def resources(self):return self.request('/v1/system')
     def status(self,ident):return self.request('/v1/jobs/'+identifier(ident))
     def download(self,ident):return self.request('/v1/jobs/'+identifier(ident)+'/image',binary=True)

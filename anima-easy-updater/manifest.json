@@ -1,5 +1,5 @@
 {
-  "version": "2026.11.24-relay4",
+  "version": "2026.11.24-relay5",
   "files": {
     "client/anima_client.py": "40046386a408ca7a9c59390e1efd615376f91a64037f56e7b0a3de246adf71ab",
     "client/cloud_task.py": "1d45cafe60060e9d7c1ce33948803ee2fcf94c20c3857517d6d22d48098ad729",
@@ -10,8 +10,8 @@
     "client/start-windows.bat": "dae616183f93ebb0403c99de1ab3c0a4c2e6c7908384ca55f8adb9090a6d1d40",
     "relay/src/worker.js": "a4bd088081cf5f3237572c2a5c54fe15fff1a4ac2ea33765b5136c50a1e22f4c",
     "relay/src/logic.js": "ce12ec9c0aeb9eb82de351347af689ddde5ef3128327475e6411623a84538b31",
-    "relay/src/ui.html": "02641c642e65360246f392de9a8b80c42c8e0d79acd1902cb339139fc7383ea8",
-    "relay/src/ui.generated.js": "93ff150a347a80f5645d88b2a8eab70cf15d4f528f519b3b8ef1b285147f05ac",
+    "relay/src/ui.html": "a793bc0aa78ba5e8bd3553ab197a71352b2d9c7d04ae56b7c6e0f4b784002a7e",
+    "relay/src/ui.generated.js": "4f44e9c7f89991dcaf0b46b965ef4b6ac13bcdb5737eb406a295ef3a6163a5ce",
     "relay/package.json": "286f74197320cb07b3ee12588c8346c1b7818c120a30f301356062f9fa08cf33",
     "relay/package-lock.json": "b113f80de8bc3a6b40ab949f2bd3be4f00b27075d3664d2506dcdc66ac9f4fe7",
     "relay/wrangler.jsonc": "69a68fcd5b9d4cdf3926b51ff1d257f01c008237f2a417d6c72b7e6a03183eb2",

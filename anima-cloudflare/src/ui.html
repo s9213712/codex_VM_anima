@@ -87,6 +87,7 @@
       <section class="card" style="margin-top:16px">
         <h2>產生圖片</h2>
         <label>提示詞</label>
+        <select id="recent" style="margin-bottom:6px"><option value="">最近用過的提示詞…</option></select>
         <textarea id="prompt" placeholder="描述你想要的畫面…"></textarea>
         <label>負面提示詞</label>
         <input id="neg" type="text" value="low quality, blurry">
@@ -113,6 +114,7 @@
         </div>
         <div class="row">
           <div><label>種子</label><input id="seed" type="number" value="42" min="0"></div>
+          <div><label>張數</label><input id="batch" type="number" min="1" max="4" value="1"></div>
           <div style="display:flex;align-items:flex-end"><button id="rand" style="width:100%">隨機</button></div>
         </div>
         <div style="margin-top:14px"><button class="primary" id="go" style="width:100%">送出</button></div>
@@ -204,6 +206,7 @@ function renderJob(j){
       <span class="meta">${fmt(j.created)}</span>
     </div>
     <div class="meta">${(p.prompt||"").slice(0,180)}</div>
+    ${j.metadata?`<div class="meta">${[j.metadata.engine,j.metadata.model,j.metadata.duration_seconds?j.metadata.duration_seconds+"s":""].filter(Boolean).join(" · ")}</div>`:""}
     ${j.status==="RUNNING"&&prog?`<div class="bar"><i style="width:${pct}%"></i></div><div class="meta">${stageMap[prog.stage]||prog.stage} ${prog.step}/${prog.total} · ${prog.elapsed_seconds?.toFixed(1)}s</div>`:""}
     ${j.error?`<div class="meta err">${j.error}</div>`:""}
   `;
@@ -273,16 +276,40 @@ async function submit(){
   else if(sizeSel.includes("x")){ const [a,b]=sizeSel.split("x"); width=+a; height=+b; }
   else { width=height=+sizeSel; }
   for(const v of [width,height]) if(v<128||v>1024||v%32){ toast("寬高必須是 128–1024 且為 32 的倍數"); return; }
-  const body = { prompt, negative_prompt: $("neg").value, width, height, steps: +$("steps").value, seed: +$("seed").value };
+  const steps = +$("steps").value;
+  const batch = Math.max(1, Math.min(4, +$("batch").value || 1));
+  const baseSeed = +$("seed").value;
   $("go").disabled = true;
+  let queued = 0, offline = false;
   try{
-    const r = await api("/v1/generations", { method:"POST", body: JSON.stringify(body) });
-    const j = await r.json();
-    jobs.unshift(j.id); localStorage.setItem(LS.jobs, JSON.stringify(jobs));
-    if(j.queued_while_agent_offline) toast("VM 代理目前離線，任務已排隊（10 分鐘內未執行會自動失敗）", 8000);
-    await refreshJobs(); refresh();
+    for(let i=0;i<batch;i++){
+      const body = { prompt, negative_prompt: $("neg").value, width, height, steps, seed: baseSeed + i };
+      const r = await api("/v1/generations", { method:"POST", body: JSON.stringify(body) });
+      const j = await r.json();
+      jobs.unshift(j.id); localStorage.setItem(LS.jobs, JSON.stringify(jobs));
+      queued++;
+      if(j.queued_while_agent_offline) offline = true;
+      await refreshJobs();
+    }
+    rememberPrompt(prompt);
+    if(queued>1) toast(`已送出 ${queued} 張（seed ${baseSeed}–${baseSeed+queued-1}）`, 5000);
+    if(offline) toast("VM 代理目前離線，任務已排隊（10 分鐘內未執行會自動失敗）", 8000);
+    refresh();
   }catch(e){ toast(e.message, 8000); }
   finally{ $("go").disabled = false; }
+}
+
+const LS_PROMPTS = "anima.prompts";
+function loadPrompts(){ try{ return JSON.parse(localStorage.getItem(LS_PROMPTS)||"[]"); }catch(e){ return []; } }
+function rememberPrompt(p){
+  const list = loadPrompts().filter(x=>x!==p); list.unshift(p);
+  localStorage.setItem(LS_PROMPTS, JSON.stringify(list.slice(0,20)));
+  renderRecent();
+}
+function renderRecent(){
+  const sel = $("recent"); const list = loadPrompts();
+  sel.innerHTML = '<option value="">最近用過的提示詞…</option>' + list.map((p,i)=>`<option value="${i}">${p.slice(0,60).replace(/</g,"&lt;")}</option>`).join("");
+  sel.onchange = () => { const i = sel.value; if(i!==""){ $("prompt").value = loadPrompts()[+i]; sel.value=""; } };
 }
 
 function applyCfg(){
@@ -318,6 +345,7 @@ $("go").onclick = submit;
 })();
 
 applyCfg();
+renderRecent();
 refresh();
 timer = setInterval(()=>{ if(cfg.key && !document.hidden) refresh(); }, 4000);
 </script>

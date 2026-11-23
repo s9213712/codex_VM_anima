@@ -8,3 +8,5 @@
 *.py text eol=lf
 *.bat text eol=lf
 *.jsonc text eol=lf
+*.sh text eol=lf
+*.service text eol=lf

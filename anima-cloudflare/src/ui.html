@@ -262,6 +262,21 @@ $("size").onchange = e => $("customRow").classList.toggle("hidden", e.target.val
 $("rand").onclick = () => $("seed").value = Math.floor(Math.random()*4294967295);
 $("go").onclick = submit;
 
+// 支援 #key=<client key> 一次性帶入（掃 QR 用），帶入後立刻從網址移除
+(function adoptHash(){
+  const h = location.hash.replace(/^#/,"");
+  if(!h) return;
+  const params = new URLSearchParams(h);
+  const k = params.get("key");
+  if(k && k.length>=32){
+    cfg.key = k;
+    cfg.url = params.get("url") || cfg.url;
+    localStorage.setItem(LS.key, cfg.key);
+    localStorage.setItem(LS.url, cfg.url);
+    history.replaceState(null, "", location.pathname);
+  }
+})();
+
 applyCfg();
 refresh();
 timer = setInterval(()=>{ if(cfg.key) refresh(); }, 4000);

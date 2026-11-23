@@ -88,6 +88,22 @@ UI 提供：
 
 尺寸限制：**128–1024 且必須是 32 的倍數**（`512`、`640`、`768`、`1024` 都合法；`500` 會在前端就被擋下）。
 
+### 手機／其他裝置帶入金鑰
+
+1. 在電腦上產生一次性 QR（會把 client key 放進網址的 `#` 片段，不會送到伺服器）：
+
+   ```bash
+   cd D:/anima-cloudflare-windows
+   K=$(tr -d '
+' < anima-cloudflare/.private/client.key)
+   npx --yes qrcode -o pair-qr.png -w 640 "https://<worker>.workers.dev/ui#key=$K"
+   ```
+
+2. 用該裝置掃 `pair-qr.png` → 開啟後會自動填入並儲存，網址列上的金鑰會被立刻清除
+3. `pair-qr.png` 已列入 `.gitignore`，**不要上傳**
+
+> QR 內含金鑰，用完請刪除圖片；若懷疑外流，請輪換 `CLIENT_KEY`（同時更新 VM 端設定）。
+
 ---
 
 ## 4. 設定 VM 代理（給 Codex 的提示詞）

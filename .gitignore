@@ -10,3 +10,4 @@ anima-cloudflare/vm-pairing/vm-pairing.encrypted.json
 *.log
 
 **/tmp/
+pair-qr.png

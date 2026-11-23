@@ -8,3 +8,5 @@ anima-cloudflare/vm-pairing/vm-pairing.encrypted.json
 **/.update-backups/
 **/.dry-run/
 *.log
+
+**/tmp/

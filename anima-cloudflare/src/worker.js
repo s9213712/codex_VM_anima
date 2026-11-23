@@ -1,3 +1,4 @@
+import UI_HTML from "./ui.html";
 const JSON_HEADERS = {"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"};
 // 代理存活與任務逾時策略（毫秒）
 const AGENT_SOFT_MS=90000;      // 超過 90 秒沒心跳：仍收單，但標記等待代理
@@ -63,16 +64,20 @@ export default {
   async fetch(request,env){
     try{
       const path=new URL(request.url).pathname;
-      if(path==="/" && request.method==="GET")return json({service:"Anima HTTPS image-job relay",authentication:"Bearer required",docs:"POST /v1/generations, then poll returned status_url"});
+      if(path==="/ui" && request.method==="GET")return new Response(UI_HTML,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});
+      if(path==="/" && request.method==="GET"){
+        if((request.headers.get("Accept")||"").includes("text/html"))return new Response(UI_HTML,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});
+        return json({build:"v2-liveness",service:"Anima HTTPS image-job relay",authentication:"Bearer required",ui:"/ui",docs:"POST /v1/generations, then poll returned status_url"});
+      }
       await authenticate(request,path.startsWith("/agent/")?env.AGENT_KEY:env.CLIENT_KEY);
-      return await env.RELAY.get(env.RELAY.idFromName("single-approved-image-worker")).fetch(request);
+      return await env.RELAY.get(env.RELAY.idFromName(env.RELAY_INSTANCE || "single-approved-image-worker-v2")).fetch(request);
     }catch(e){return json({error:e instanceof HttpError?e.message:"Relay temporarily unavailable"},e instanceof HttpError?e.status:503);}
   }
 };
 
 export { authenticate, bytes, bodyJSON, validJob, safeMetrics, publicJob, agentGate, HttpError, json, AGENT_SOFT_MS, AGENT_HARD_MS, LEASE_MS, PENDING_MAX_MS };
 
-export class AnimaRelay {
+export class AnimaRelayV2 {
 
   constructor(ctx,env){
     this.ctx=ctx;this.env=env;this.sql=ctx.storage.sql;

@@ -3,11 +3,19 @@
     "main":  "src/worker.js",
     "compatibility_date":  "2026-07-30",
     "workers_dev":  true,
+    "rules":  [
+                  {
+                      "type":  "Text",
+                      "globs":  [
+                                    "**/*.html"
+                                ]
+                  }
+              ],
     "durable_objects":  {
                             "bindings":  [
                                              {
                                                  "name":  "RELAY",
-                                                 "class_name":  "AnimaRelay"
+                                                 "class_name":  "AnimaRelayV2"
                                              }
                                          ]
                         },
@@ -17,6 +25,15 @@
                            "new_sqlite_classes":  [
                                                       "AnimaRelay"
                                                   ]
+                       },
+                       {
+                           "tag":  "v2",
+                           "renamed_classes":  [
+                                                   {
+                                                       "from":  "AnimaRelay",
+                                                       "to":  "AnimaRelayV2"
+                                                   }
+                                               ]
                        }
                    ],
     "observability":  {

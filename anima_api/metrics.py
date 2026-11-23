@@ -49,5 +49,5 @@ def snapshot(model,started_at):
               'capabilities':{'vm_create':False,'vm_wake':False,'inference_device':'cpu'}}
             _CACHE_AT=now
         result={**_CACHE,'model':{'state':model.get('state'),'rss_bytes':model.get('current_rss_bytes'),'observed_at':model.get('observed_at')},
-            'api':{'uptime_seconds':max(0,int(time.time()-started_at)),'lease_remaining_seconds':max(0,int(10800-(time.time()-started_at)))}}
+            'api':{'uptime_seconds':max(0,int(time.time()-started_at)),'lease_remaining_seconds':None}}
         return result

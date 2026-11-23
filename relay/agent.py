@@ -39,9 +39,12 @@ def execute(remote,local,job,session_deadline):
     if not data.get('local_id'):
         r=local.post('/v1/generations',headers={'Idempotency-Key':ident},json=job['request']);r.raise_for_status()
         data=checkpoint(ident,local_id=str(uuid.UUID(r.json()['id'])))
-    local_id=data['local_id'];deadline=min(session_deadline,time.monotonic()+650);heartbeat=0
+    local_id=data['local_id'];deadline=session_deadline;heartbeat=0
     while time.monotonic()<deadline:
         r=local.get('/v1/jobs/'+local_id);r.raise_for_status();state=r.json()
+        if state.get('progress'):
+            progress=remote.post('/agent/jobs/'+ident+'/progress',headers=lease_headers,json={**state['progress'],'elapsed_seconds':max(0,time.time()-state['started']) if state.get('started') else 0,'log_tail':state.get('log_tail','')[-8192:]})
+            if progress.status_code!=404:progress.raise_for_status()
         if state['status']=='FAILED':raise RuntimeError(state['error'])
         if state['status']=='SUCCEEDED':
             r=local.get('/v1/jobs/'+local_id+'/image');r.raise_for_status()
@@ -65,12 +68,12 @@ def execute(remote,local,job,session_deadline):
     raise TimeoutError('Local generation polling deadline exceeded')
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--url',default=os.environ.get('ANIMA_RELAY_URL'));p.add_argument('--local-test',action='store_true');p.add_argument('--once',action='store_true');p.add_argument('--seconds',type=int,default=10800)
+    p=argparse.ArgumentParser();p.add_argument('--url',default=os.environ.get('ANIMA_RELAY_URL'));p.add_argument('--local-test',action='store_true');p.add_argument('--once',action='store_true');p.add_argument('--seconds',type=int,default=0)
     args=p.parse_args()
     if not args.url:p.error('ANIMA_RELAY_URL or --url is required')
-    if not 10<=args.seconds<=10800:p.error('Session seconds must be 10..10800')
+    if args.seconds!=0 and not 10<=args.seconds<=10800:p.error('Optional session seconds must be 10..10800; 0 has no application time limit')
     url=validate_url(args.url,args.local_test);key=secret('ANIMA_RELAY_AGENT_KEY');api_key=(STATE/'api.key').read_text().strip()
-    deadline=time.monotonic()+args.seconds
+    deadline=time.monotonic()+args.seconds if args.seconds else float('inf')
     # Inherited proxy/CA remains active for the public relay; localhost traffic stays inside this VM.
     with httpx.Client(base_url=url,headers={'Authorization':'Bearer '+key},timeout=30,trust_env=not args.local_test,follow_redirects=False) as remote, \
          httpx.Client(base_url='http://127.0.0.1:8765',headers={'Authorization':'Bearer '+api_key},timeout=15,trust_env=False) as local:

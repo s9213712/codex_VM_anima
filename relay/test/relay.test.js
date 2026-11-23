@@ -62,3 +62,14 @@ test('resource view needs client auth, reports timestamp and filters unapproved 
  assert.equal(result.cpu.quota_cores,4);assert.equal(result.agent_recent,true);assert.equal(result.capabilities.vm_create,false);
  assert.equal(JSON.stringify(result).includes('must never forward'),false);assert.ok(result.snapshot_age_seconds>=0);
 }));
+
+test('rectangular large jobs expose only authenticated lease progress',()=>harness(async req=>{
+ const accepted=await submit(req,{prompt:'landscape',width:1024,height:576,steps:4});assert.equal(accepted.status,202);
+ const job=await accepted.json();const lease=(await (await claim(req)).json()).job;
+ const path='/agent/jobs/'+job.id+'/progress';const data={stage:'DENOISING',step:2,total:4,elapsed_seconds:10,log_tail:'actual worker output test'};
+ assert.equal((await req(path,{method:'POST',key:AGENT,headers:{'X-Lease-Token':'wrong'},body:JSON.stringify(data)})).status,409);
+ assert.equal((await req(path,{method:'POST',key:AGENT,headers:{'X-Lease-Token':lease.lease},body:JSON.stringify(data)})).status,200);
+ let state=await (await req(job.status_url)).json();assert.equal(state.progress.step,2);assert.equal(state.progress.total,4);assert.equal(state.progress.log_tail,'actual worker output test');
+ assert.equal((await req(path,{method:'POST',key:AGENT,headers:{'X-Lease-Token':lease.lease},body:JSON.stringify({...data,step:5})})).status,422);
+ assert.equal((await submit(req,{prompt:'x',width:1056})).status,422);
+}));

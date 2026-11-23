@@ -16,13 +16,15 @@ def identifier(value):
     try:return str(uuid.UUID(value))
     except (ValueError,TypeError):raise ClientError('Invalid task ID')
 
-def params(prompt,negative_prompt='low quality, blurry',size=256,steps=8,seed=42):
+def params(prompt,negative_prompt='low quality, blurry',size=256,steps=8,seed=42,width=None,height=None):
     if not isinstance(prompt,str) or not 1<=len(prompt)<=1500:raise ClientError('Prompt needs 1..1500 characters')
     if len(negative_prompt)>1000:raise ClientError('Negative prompt too long')
-    if not isinstance(size,int) or not 128<=size<=512 or size%32:raise ClientError('Size must be 128..512 and a multiple of 32')
+    width=size if width is None else width; height=size if height is None else height
+    for value in (width,height):
+        if type(value) is not int or not 128<=value<=1024 or value%32:raise ClientError('Width and height must be 128..1024 and multiples of 32')
     if not isinstance(steps,int) or not 1<=steps<=20:raise ClientError('Steps must be 1..20')
     if not isinstance(seed,int) or not 0<=seed<=2**32-1:raise ClientError('Invalid seed')
-    return {'prompt':prompt,'negative_prompt':negative_prompt,'width':size,'height':size,'steps':steps,'seed':seed}
+    return {'prompt':prompt,'negative_prompt':negative_prompt,'width':width,'height':height,'steps':steps,'seed':seed}
 
 class API:
     def __init__(self,url,key,allow_local=False):
@@ -57,8 +59,8 @@ def save_image(data,path,expected=None):
     target.parent.mkdir(parents=True,exist_ok=True);temp=target.with_suffix(target.suffix+'.partial');temp.write_bytes(data);temp.replace(target)
     return target
 
-def wait(client,ident,timeout=1200,interval=10):
-    deadline=time.monotonic()+timeout
+def wait(client,ident,timeout=None,interval=10):
+    deadline=time.monotonic()+timeout if timeout is not None else float('inf')
     while time.monotonic()<deadline:
         state=client.status(ident);print('STATUS',state.get('status','PENDING'),flush=True)
         if state.get('status') in ('FAILED','BLOCKED'):raise ClientError(state.get('error') or 'Task failed')
@@ -69,7 +71,7 @@ def wait(client,ident,timeout=1200,interval=10):
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--api');p.add_argument('--repo');p.add_argument('--key-file',type=Path);p.add_argument('--local-test',action='store_true')
     sub=p.add_subparsers(dest='command',required=True)
-    submit=sub.add_parser('submit');submit.add_argument('--prompt');submit.add_argument('--prompt-file',type=Path);submit.add_argument('--size',type=int,default=256);submit.add_argument('--steps',type=int,default=8);submit.add_argument('--seed',type=int,default=42);submit.add_argument('--wait',action='store_true');submit.add_argument('--output',default='result.png')
+    submit=sub.add_parser('submit');submit.add_argument('--prompt');submit.add_argument('--prompt-file',type=Path);submit.add_argument('--size',type=int,default=256);submit.add_argument('--width',type=int);submit.add_argument('--height',type=int);submit.add_argument('--steps',type=int,default=8);submit.add_argument('--seed',type=int,default=42);submit.add_argument('--wait',action='store_true');submit.add_argument('--output',default='result.png')
     resources=sub.add_parser('resources');resources.add_argument('--watch',type=int,default=0,help='Refresh seconds, 1..60; omit for one snapshot');resources.add_argument('--duration',type=int,default=10800,help='Maximum watch lifetime, 1..10800 seconds')
     status=sub.add_parser('status');status.add_argument('id')
     download=sub.add_parser('download');download.add_argument('id');download.add_argument('--output',required=True)
@@ -93,7 +95,7 @@ def main():
         if a.command=='download':
             state=client.status(a.id);print(save_image(client.download(a.id),a.output,(state.get('metadata') or {}).get('sha256')));return
         prompt=a.prompt_file.read_text(encoding='utf-8') if a.prompt_file else a.prompt
-        job=client.submit(params(prompt,size=a.size,steps=a.steps,seed=a.seed));print(json.dumps(job,ensure_ascii=False))
+        job=client.submit(params(prompt,size=a.size,width=a.width,height=a.height,steps=a.steps,seed=a.seed));print(json.dumps(job,ensure_ascii=False))
         if a.wait:
             state=wait(client,job['id']);print(save_image(client.download(job['id']),a.output,(state.get('metadata') or {}).get('sha256')))
     except KeyboardInterrupt:return

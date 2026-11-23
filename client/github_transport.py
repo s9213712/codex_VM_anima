@@ -25,7 +25,7 @@ def validate(data):
         if re.search(r'(gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{24,}|-----BEGIN [A-Z ]*PRIVATE KEY)',value):raise GitHubError('Potential credential in prompt; do not put secrets in image tasks')
     for key in ('width','height'):
         value=data.get(key,256)
-        if type(value) is not int or not 128<=value<=512 or value%32:raise GitHubError('Invalid image size')
+        if type(value) is not int or not 128<=value<=1024 or value%32:raise GitHubError('Invalid image size')
     if type(data.get('steps',8)) is not int or not 1<=data.get('steps',8)<=20:raise GitHubError('Invalid steps')
     if type(data.get('seed',42)) is not int or not 0<=data.get('seed',42)<=4294967295:raise GitHubError('Invalid seed')
     return {'prompt':data['prompt'],'negative_prompt':data.get('negative_prompt','low quality, blurry'),

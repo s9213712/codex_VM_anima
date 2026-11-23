@@ -1,0 +1,13 @@
+# Resolution and progress update — 2026-11-23
+
+Implemented independent width/height, 128–1024 in multiples of 32. CLI --size remains backward compatible; --width/--height override each axis. Browser includes aspect presets, swap, numeric steps 1–20, seed randomization and JSON parameter export. No unsupported sampler/CFG/LoRA control is presented as functional.
+
+Worker wraps its own scheduler.step instance during a job and restores it in finally. A completed scheduler step is persisted to SQLite, exposed through authenticated API, forwarded with the job lease to Cloudflare and polled every five seconds. Zero-step encoding and post-denoise image saving are separate stages. This is scalar progress, not a live intermediate-image preview. Estimated remaining denoising time uses observed completed-step elapsed time and is labeled an estimate. Timings include initial encoding; not a completion guarantee.
+
+Per owner request there is no fixed generation deadline or default agent/API lifetime. Explicit optional agent --seconds remains available. Network requests keep transport timeouts. A live agent renews the remote job lease on each authenticated progress report; losing that agent still expires the job. Existing running processes retain old limits until restarted after idle. Memory cap stays 12GiB worker RSS, one generation at a time; output relay retains its 2MiB PNG cap. Thus 1024 input validation success does not guarantee every large image fits memory, runtime or encoded-output limits.
+
+Cloudflare must be updated by owner rerunning Deploy-Anima.ps1 from the updated deployment package in the original directory. Keep its original .private directory so app keys are preserved. No new SQLite class migration is necessary; progress uses existing meta table. Expired job progress is deleted with job retention on next request.
+
+Validation: Python 18 tests, Miniflare 7 tests including 1024x576 acceptance, 1056 rejection, wrong-lease rejection and step payload retrieval; JavaScript syntax checked. These contract tests are not a claim that a 1024 image was generated. Actual larger-model inference evidence will be recorded separately.
+
+Actual per-job stdout/stderr (including the diffusion tqdm output and exception traceback) is captured in .state/job-logs and forwarded as a capped 8KB tail to the job owner. Whole-VM logs and environment variables are not exposed. No intermediate-image preview is claimed. CPU/RAM/free-disk canvas line charts use only timestamped observations after the client starts, retain 120 samples, and break lines when offline or between distant snapshots.

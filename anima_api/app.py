@@ -16,8 +16,8 @@ def auth(credential:HTTPAuthorizationCredentials|None=Depends(bearer)):
 class Generate(BaseModel):
     prompt:str=Field(min_length=1,max_length=1500)
     negative_prompt:str=Field(default='low quality, blurry',max_length=1000)
-    width:int=Field(default=256,ge=128,le=512)
-    height:int=Field(default=256,ge=128,le=512)
+    width:int=Field(default=256,ge=128,le=1024)
+    height:int=Field(default=256,ge=128,le=1024)
     steps:int=Field(default=8,ge=1,le=20)
     seed:int=Field(default=42,ge=0,le=2**32-1)
     @field_validator('width','height')
@@ -34,9 +34,7 @@ async def supervise(child):
             rss=psutil.Process(child.pid).memory_info().rss
             if rss>12*1024**3:raise RuntimeError('Worker exceeded 12GiB RSS budget')
             with store.connect() as c:row=c.execute("SELECT started FROM jobs WHERE status='RUNNING' LIMIT 1").fetchone()
-            if row and time.time()-row['started']>600:raise RuntimeError('Generation exceeded 600-second deadline')
             if (store.status('model') or {}).get('state')=='LOADING' and time.monotonic()-started>180:raise RuntimeError('Model loading exceeded 180 seconds')
-            if time.monotonic()-started>10800:raise RuntimeError('Three-hour worker lease expired')
             if time.monotonic()-last_update>5:
                 store.observe_model(rss);last_update=time.monotonic()
         raise RuntimeError('Model worker exited: '+str(child.returncode))
@@ -80,7 +78,9 @@ def generate(request:Generate,idempotency_key:uuid.UUID|None=Header(default=None
 def job(ident:uuid.UUID):
     row=store.get(str(ident))
     if not row:raise HTTPException(404,'Job not found')
-    row['request']=json.loads(row['request']);row['metadata']=json.loads(row['metadata']) if row['metadata'] else None
+    logfile=STATE/'job-logs'/(str(ident)+'.log')
+    row['log_tail']=logfile.read_bytes()[-8192:].decode('utf-8',errors='replace') if logfile.exists() else ''
+    row['progress']=store.status('progress:'+str(ident));row['request']=json.loads(row['request']);row['metadata']=json.loads(row['metadata']) if row['metadata'] else None
     if row['status']=='SUCCEEDED':row['image_url']='/v1/jobs/'+str(ident)+'/image'
     return row
 @app.get('/v1/jobs/{ident}/image',dependencies=[Depends(auth)])

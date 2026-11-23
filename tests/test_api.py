@@ -19,7 +19,7 @@ def test_auth_and_not_ready(client):
 
 def test_bounds(client):
     store.status('model',{'state':'READY'})
-    for data in [{'prompt':'x','steps':21},{'prompt':'x','width':1024},{'prompt':'x','height':257},{'prompt':''},{'prompt':'x','seed':-1}]:
+    for data in [{'prompt':'x','steps':21},{'prompt':'x','width':1056},{'prompt':'x','height':257},{'prompt':''},{'prompt':'x','seed':-1}]:
         assert client.post('/v1/generations',headers=auth(),json=data).status_code==422
 
 def test_persistent_queue_and_backpressure(client):
@@ -62,3 +62,13 @@ def test_resource_snapshot_requires_auth_and_returns_real_measurements(client):
     assert result['capabilities']['vm_create'] is False
     assert result['capabilities']['vm_wake'] is False
     assert 'unit-test-only-' not in r.text
+
+def test_rectangular_dimensions_and_real_progress_payload(client):
+    store.status('model',{'state':'READY'})
+    r=client.post('/v1/generations',headers=auth(),json={'prompt':'landscape','width':1024,'height':576,'steps':4})
+    assert r.status_code==202
+    ident=r.json()['id']
+    store.status('progress:'+ident,{'stage':'DENOISING','step':2,'total':4,'elapsed_seconds':10,'updated_at':123})
+    result=client.get('/v1/jobs/'+ident,headers=auth()).json()
+    assert result['request']['width']==1024 and result['request']['height']==576
+    assert result['progress']['step']==2

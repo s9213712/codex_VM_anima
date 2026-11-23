@@ -28,7 +28,7 @@ function validJob(input){
   if(typeof input.prompt!=="string" || !input.prompt.trim() || input.prompt.length>1500)throw new HttpError(422,"prompt must contain 1..1500 characters");
   const job={prompt:input.prompt,negative_prompt:input.negative_prompt??"low quality, blurry",width:input.width??256,height:input.height??256,steps:input.steps??8,seed:input.seed??42};
   if(typeof job.negative_prompt!=="string" || job.negative_prompt.length>1000)throw new HttpError(422,"negative_prompt too long");
-  for(const field of ["width","height"])if(!Number.isInteger(job[field])||job[field]<128||job[field]>512||job[field]%32)throw new HttpError(422,"Dimensions must be 128..512 and multiples of 32");
+  for(const field of ["width","height"])if(!Number.isInteger(job[field])||job[field]<128||job[field]>1024||job[field]%32)throw new HttpError(422,"Dimensions must be 128..1024 and multiples of 32");
   if(!Number.isInteger(job.steps)||job.steps<1||job.steps>20)throw new HttpError(422,"steps must be 1..20");
   if(!Number.isInteger(job.seed)||job.seed<0||job.seed>4294967295)throw new HttpError(422,"Invalid seed");
   // Reject data that could turn this application relay into arbitrary URL/command forwarding.
@@ -71,6 +71,7 @@ export class AnimaRelay {
     try{
       const now=Date.now(),path=new URL(request.url).pathname,method=request.method;
       this.sql.exec("DELETE FROM jobs WHERE created < ?",now-86400000);
+      this.sql.exec("DELETE FROM meta WHERE key LIKE 'progress:%' AND substr(key,10) NOT IN (SELECT id FROM jobs)");
       this.sql.exec("UPDATE jobs SET status='FAILED',finished=?,error='Worker lease expired; resubmit explicitly' WHERE status='RUNNING' AND lease_until < ?",now,now);
       if(path==="/healthz" && method==="GET"){
         const heartbeat=this.rows("SELECT value FROM meta WHERE key='agent'")[0];const agent=heartbeat?JSON.parse(heartbeat.value):null;
@@ -97,7 +98,7 @@ export class AnimaRelay {
           if(row.status!=="SUCCEEDED")throw new HttpError(409,"Image not ready");
           return new Response(row.image,{headers:{"Content-Type":"image/png","Cache-Control":"no-store","X-Content-Type-Options":"nosniff","Content-Disposition":`attachment; filename="${row.id}.png"`}});
         }
-        return json(publicJob(row));
+        const progress=this.rows("SELECT value FROM meta WHERE key=?",'progress:'+row.id)[0];return json({...publicJob(row),progress:progress?JSON.parse(progress.value):null});
       }
       if((path==="/agent/claim" || path==="/agent/heartbeat") && method==="POST"){
         const input=await bodyJSON(request,2048);
@@ -106,8 +107,19 @@ export class AnimaRelay {
         if(input.ready!==true)return json({job:null});
         if(this.rows("SELECT id FROM jobs WHERE status='RUNNING' LIMIT 1").length)return json({job:null});
         const row=this.rows("SELECT * FROM jobs WHERE status='PENDING' ORDER BY created,id LIMIT 1")[0];if(!row)return json({job:null});
-        const lease=crypto.randomUUID();this.sql.exec("UPDATE jobs SET status='RUNNING',started=?,lease=?,lease_until=? WHERE id=?",now,lease,now+900000,row.id);
-        return json({job:{id:row.id,request:JSON.parse(row.request_json),lease,lease_until:now+900000}});
+        const lease=crypto.randomUUID();this.sql.exec("UPDATE jobs SET status='RUNNING',started=?,lease=?,lease_until=? WHERE id=?",now,lease,now+2100000,row.id);
+        return json({job:{id:row.id,request:JSON.parse(row.request_json),lease,lease_until:now+2100000}});
+      }
+      match=path.match(new RegExp(`^/agent/jobs/(${ID})/progress$`));
+      if(match && method==='POST'){
+        const data=await bodyJSON(request,12000);
+        const row=this.rows('SELECT * FROM jobs WHERE id=?',match[1])[0];
+        if(!row || row.status!=='RUNNING' || row.lease!==request.headers.get('X-Lease-Token') || row.lease_until<now)throw new HttpError(409,'Invalid progress lease');
+        const total=JSON.parse(row.request_json).steps;
+        if(!['ENCODING','DENOISING','DECODING','SAVING'].includes(data.stage)||!Number.isInteger(data.step)||data.step<0||data.step>total||!Number.isFinite(data.elapsed_seconds)||data.elapsed_seconds<0)throw new HttpError(422,'Invalid progress');
+        this.sql.exec('INSERT OR REPLACE INTO meta(key,value) VALUES(?,?)','progress:'+row.id,JSON.stringify({stage:data.stage,step:data.step,total,elapsed_seconds:data.elapsed_seconds,updated_at:now/1000,log_tail:typeof data.log_tail==='string'?data.log_tail.slice(-8192):''}));
+        this.sql.exec('UPDATE jobs SET lease_until=? WHERE id=?',now+120000,row.id);
+        return json({ok:true});
       }
       match=path.match(new RegExp(`^/agent/jobs/(${ID})/(complete|fail)$`));
       if(match && method==="POST"){

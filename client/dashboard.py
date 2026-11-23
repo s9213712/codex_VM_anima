@@ -53,7 +53,7 @@ class Handler(BaseHTTPRequestHandler):
             if not 0<length<=12000:raise ClientError('Invalid request size')
             data=json.loads(self.rfile.read(length))
             if self.path=='/api/submit':
-                request=params(data.get('prompt'),negative_prompt=data.get('negative_prompt','low quality, blurry'),size=int(data.get('size',256)),steps=int(data.get('steps',8)),seed=int(data.get('seed',42)))
+                request=params(data.get('prompt'),negative_prompt=data.get('negative_prompt','low quality, blurry'),size=int(data.get('size',256)),width=int(data.get('width',data.get('size',256))),height=int(data.get('height',data.get('size',256))),steps=int(data.get('steps',8)),seed=int(data.get('seed',42)))
                 self.send_data(self.server.client.submit(request),202);return
             if self.path=='/api/cloud-task':
                 env=self.server.config.get('codex_environment_id','')
@@ -70,13 +70,14 @@ class Handler(BaseHTTPRequestHandler):
         except (ClientError,GitHubError,OSError,ValueError,subprocess.TimeoutExpired) as e:self.send_data({'error':str(e)},400)
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--config',type=Path,default=Path(__file__).with_name('connection.json'));p.add_argument('--port',type=int,default=0);p.add_argument('--no-browser',action='store_true');p.add_argument('--seconds',type=int,default=10800);a=p.parse_args()
-    if not 10<=a.seconds<=10800:p.error('Client lifetime must be 10..10800 seconds')
+    p=argparse.ArgumentParser();p.add_argument('--config',type=Path,default=Path(__file__).with_name('connection.json'));p.add_argument('--port',type=int,default=0);p.add_argument('--no-browser',action='store_true');p.add_argument('--seconds',type=int,default=0);a=p.parse_args()
+    if a.seconds!=0 and not 10<=a.seconds<=10800:p.error('Optional client lifetime must be 10..10800; 0 is unlimited')
     if not a.config.exists():raise SystemExit('Connection configuration missing; use the supplied client package')
     config=json.loads(a.config.read_text(encoding='utf-8'));client=GitHub(config['repo']) if config.get('backend')=='github' else API(config['api'],Path(config['key_file']).read_text(encoding='utf-8').strip())
     server=LocalServer(('127.0.0.1',a.port),client,config);url='http://127.0.0.1:'+str(server.server_port)
     print('Anima local client:',url,flush=True)
-    timer=threading.Timer(a.seconds,server.shutdown);timer.daemon=True;timer.start()
+    timer=threading.Timer(a.seconds,server.shutdown);timer.daemon=True
+    if a.seconds:timer.start()
     if not a.no_browser:webbrowser.open(url)
     try:server.serve_forever()
     except KeyboardInterrupt:pass

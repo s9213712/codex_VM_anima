@@ -17,7 +17,7 @@ const PAYLOAD = join(HERE, "payload");
 
 const LF = String.fromCharCode(10);
 const CR = String.fromCharCode(13);
-const TEXT = /\.(js|mjs|cjs|json|html|md|py|txt|ya?ml)$/;
+const TEXT = /\.(js|mjs|cjs|json|jsonc|html|md|py|txt|bat|ya?ml)$/;
 
 // client/* -> anima-client/* ；relay/* -> 專案根目錄
 const CLIENT_FILES = [

@@ -6,3 +6,5 @@
 *.yml text eol=lf
 *.md text eol=lf
 *.py text eol=lf
+*.bat text eol=lf
+*.jsonc text eol=lf

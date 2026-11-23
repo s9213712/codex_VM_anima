@@ -1,0 +1,34 @@
+{
+  "id": "1ab7d99d-7171-4adf-8378-9139bc7d6917",
+  "status": "SUCCEEDED",
+  "error": null,
+  "request": {
+    "prompt": "a small wooden house beside a mountain lake, anime landscape",
+    "negative_prompt": "low quality, blurry",
+    "width": 768,
+    "height": 512,
+    "steps": 1,
+    "seed": 42
+  },
+  "metadata": {
+    "model": "circlestone-labs/Anima-Base-v1.0-Diffusers",
+    "revision": "073c3a9db359c31ad0e8aa268d15775473c2176c",
+    "device": "cpu",
+    "dtype": "bfloat16",
+    "elapsed_seconds": 158.73982518900084,
+    "rss_at_completion_bytes": 5876006912,
+    "width": 768,
+    "height": 512,
+    "steps": 1,
+    "seed": 42,
+    "sha256": "f700eec26a186b090d71f230a139078a6592a621b658ace06d87cbe075263005"
+  },
+  "progress": {
+    "stage": "SAVING",
+    "step": 1,
+    "total": 1,
+    "elapsed_seconds": 158.50409977000163,
+    "updated_at": 1795441332.424602
+  },
+  "log_tail": "JOB_STARTED 1ab7d99d-7171-4adf-8378-9139bc7d6917 768x512 steps=1\n\r  0%|          | 0/1 [00:00<?, ?it/s]\r100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 1/1 [01:37<00:00, 97.08s/it]\r100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 1/1 [01:37<00:00, 97.08s/it]\nJOB_FINISHED 1ab7d99d-7171-4adf-8378-9139bc7d6917 status=SUCCEEDED\n"
+}

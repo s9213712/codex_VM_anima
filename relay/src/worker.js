@@ -41,7 +41,7 @@ function safeMetrics(value){
   return {sampled_at:number(value.sampled_at),cpu:{visible_cores:number(value.cpu?.visible_cores),quota_cores:number(value.cpu?.quota_cores),quota_usage_percent:number(value.cpu?.quota_usage_percent)},
     memory:{limit_bytes:number(value.memory?.limit_bytes),used_bytes:number(value.memory?.used_bytes),quota_headroom_bytes:number(value.memory?.quota_headroom_bytes)},
     disk:{total_bytes:number(value.disk?.total_bytes),used_bytes:number(value.disk?.used_bytes),free_bytes:number(value.disk?.free_bytes)},
-    model:{state:['READY','LOADING','ERROR','STARTING'].includes(value.model?.state)?value.model.state:'UNKNOWN',rss_bytes:number(value.model?.rss_bytes)},
+    model:{state:['READY','LOADING','ERROR','STARTING'].includes(value.model?.state)?value.model.state:'UNKNOWN',rss_bytes:number(value.model?.rss_bytes),turbo_lora:value.model?.turbo_lora===true,lora_name:typeof value.model?.lora_name==='string'?value.model.lora_name.slice(0,80):null,guidance_scale:number(value.model?.guidance_scale),default_steps:number(value.model?.default_steps)},
     api:{uptime_seconds:number(value.api?.uptime_seconds),lease_remaining_seconds:number(value.api?.lease_remaining_seconds)},
     capabilities:{vm_create:false,vm_wake:false,inference_device:'cpu'}};
 }

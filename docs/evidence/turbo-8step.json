@@ -1,0 +1,40 @@
+{
+  "id": "53055fbe-3bb4-4d67-8007-d9c51d198c09",
+  "status": "SUCCEEDED",
+  "error": null,
+  "request": {
+    "prompt": "anime coloring, a small wooden house beside a peaceful mountain lake at sunrise",
+    "negative_prompt": "low quality, blurry",
+    "width": 256,
+    "height": 256,
+    "steps": 8,
+    "seed": 42
+  },
+  "metadata": {
+    "turbo_lora": true,
+    "lora_name": "Anima Turbo v0.2",
+    "lora_sha256": "1b55e40bdb1d0e5a78cb498f245fccfdaae97823265db957d2aabdcf4cd3caf1",
+    "lora_strength": 1.0,
+    "guidance_scale": 1.0,
+    "scheduler": "FlowMatchEulerDiscreteScheduler",
+    "model": "circlestone-labs/Anima-Base-v1.0-Diffusers",
+    "revision": "073c3a9db359c31ad0e8aa268d15775473c2176c",
+    "device": "cpu",
+    "dtype": "bfloat16",
+    "elapsed_seconds": 73.76995621599963,
+    "rss_at_completion_bytes": 5967147008,
+    "width": 256,
+    "height": 256,
+    "steps": 8,
+    "seed": 42,
+    "sha256": "b2449492ba2682661ff9932279020790d5f6216ae31f78826cc6e4dd5073aa6a"
+  },
+  "progress": {
+    "stage": "SAVING",
+    "step": 8,
+    "total": 8,
+    "elapsed_seconds": 73.72073553399969,
+    "updated_at": 1795441634.4884334
+  },
+  "log_tail": "JOB_STARTED 53055fbe-3bb4-4d67-8007-d9c51d198c09 256x256 steps=8\n\r  0%|          | 0/8 [00:00<?, ?it/s]\r 12%|\u2588\u258e        | 1/8 [00:08<00:59,  8.55s/it]\r 25%|\u2588\u2588\u258c       | 2/8 [00:16<00:49,  8.26s/it]\r 38%|\u2588\u2588\u2588\u258a      | 3/8 [00:24<00:40,  8.05s/it]\r 50%|\u2588\u2588\u2588\u2588\u2588     | 4/8 [00:32<00:32,  8.10s/it]\r 62%|\u2588\u2588\u2588\u2588\u2588\u2588\u258e   | 5/8 [00:40<00:24,  8.18s/it]\r 75%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258c  | 6/8 [00:49<00:16,  8.27s/it]\r 88%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u258a | 7/8 [00:57<00:08,  8.20s/it]\r100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 8/8 [01:05<00:00,  8.14s/it]\r100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 8/8 [01:05<00:00,  8.18s/it]\nJOB_FINISHED 53055fbe-3bb4-4d67-8007-d9c51d198c09 status=SUCCEEDED\n"
+}

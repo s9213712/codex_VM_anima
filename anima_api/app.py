@@ -34,7 +34,6 @@ async def supervise(child):
             rss=psutil.Process(child.pid).memory_info().rss
             if rss>12*1024**3:raise RuntimeError('Worker exceeded 12GiB RSS budget')
             with store.connect() as c:row=c.execute("SELECT started FROM jobs WHERE status='RUNNING' LIMIT 1").fetchone()
-            if (store.status('model') or {}).get('state')=='LOADING' and time.monotonic()-started>180:raise RuntimeError('Model loading exceeded 180 seconds')
             if time.monotonic()-last_update>5:
                 store.observe_model(rss);last_update=time.monotonic()
         raise RuntimeError('Model worker exited: '+str(child.returncode))

@@ -48,6 +48,6 @@ def snapshot(model,started_at):
               'system':{'os':platform.system(),'arch':platform.machine(),'kernel':platform.release()},
               'capabilities':{'vm_create':False,'vm_wake':False,'inference_device':'cpu'}}
             _CACHE_AT=now
-        result={**_CACHE,'model':{'state':model.get('state'),'rss_bytes':model.get('current_rss_bytes'),'observed_at':model.get('observed_at')},
+        result={**_CACHE,'model':{'state':model.get('state'),'rss_bytes':model.get('current_rss_bytes'),'observed_at':model.get('observed_at'),'turbo_lora':model.get('turbo_lora',False),'lora_name':model.get('lora_name'),'guidance_scale':model.get('guidance_scale'),'default_steps':model.get('default_steps')},
             'api':{'uptime_seconds':max(0,int(time.time()-started_at)),'lease_remaining_seconds':None}}
         return result

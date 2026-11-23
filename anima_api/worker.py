@@ -11,9 +11,19 @@ def main():
         path=(ROOT/'.state/model-path.txt').read_text().strip()
         pipeline=ModularPipeline.from_pretrained(path,local_files_only=True,trust_remote_code=False)
         pipeline.load_components(pretrained_model_name_or_path=path,local_files_only=True,revision=None,dtype=torch.bfloat16)
+        from diffusers.guiders import ClassifierFreeGuidance
+        lora=ROOT/'.cache/lora/anima-turbo-lora-v0.2.safetensors'
+        expected='1b55e40bdb1d0e5a78cb498f245fccfdaae97823265db957d2aabdcf4cd3caf1'
+        if not lora.is_file() or hashlib.sha256(lora.read_bytes()).hexdigest()!=expected:raise RuntimeError('Verified Anima Turbo v0.2 LoRA is missing; run scripts/install-turbo.py')
+        pipeline.load_lora_weights(str(lora),adapter_name='anima_turbo_v02',local_files_only=True)
+        pipeline.set_adapters('anima_turbo_v02',adapter_weights=1.0)
+        pipeline.fuse_lora(components=['transformer','text_conditioner'],adapter_names=['anima_turbo_v02'],safe_fusing=True)
+        pipeline.update_components(guider=ClassifierFreeGuidance(guidance_scale=1.0))
+        if type(pipeline.scheduler).__name__!='FlowMatchEulerDiscreteScheduler':raise RuntimeError('Expected Euler flow scheduler for Turbo')
+        print('TURBO_LORA_LOADED v0.2 strength=1 CFG=1 Euler default_steps=8 sha256='+expected,flush=True)
         pipeline.to('cpu')
         if hasattr(pipeline.vae,'enable_tiling'):pipeline.vae.enable_tiling()
-        store.status('model',{'state':'READY','model':MODEL,'revision':REVISION,'device':'cpu','dtype':'bfloat16','ready_at':time.time()})
+        store.status('model',{'state':'READY','model':MODEL,'revision':REVISION,'device':'cpu','dtype':'bfloat16','ready_at':time.time(),'turbo_lora':True,'lora_name':'Anima Turbo v0.2','guidance_scale':1.0,'scheduler':'FlowMatchEulerDiscreteScheduler','default_steps':8})
         print('MODEL_READY',flush=True)
     except Exception as e:
         traceback.print_exc();store.status('model',{'state':'ERROR','error':str(e)[:1000]});return
@@ -42,7 +52,7 @@ def main():
             store.status('progress:'+task['id'],{'stage':'SAVING','step':completed,'total':request['steps'],'elapsed_seconds':time.monotonic()-started,'updated_at':time.time()})
             image=state.images[0];target=OUTPUT/(task['id']+'.png');temp=target.with_suffix('.partial')
             image.save(temp,format='PNG');temp.replace(target)
-            metadata={'model':MODEL,'revision':REVISION,'device':'cpu','dtype':'bfloat16','elapsed_seconds':time.monotonic()-started,
+            metadata={'turbo_lora':True,'lora_name':'Anima Turbo v0.2','lora_sha256':expected,'lora_strength':1.0,'guidance_scale':1.0,'scheduler':type(pipeline.scheduler).__name__,'model':MODEL,'revision':REVISION,'device':'cpu','dtype':'bfloat16','elapsed_seconds':time.monotonic()-started,
                 'rss_at_completion_bytes':psutil.Process().memory_info().rss,'width':image.width,'height':image.height,'steps':request['steps'],
                 'seed':request['seed'],'sha256':hashlib.sha256(target.read_bytes()).hexdigest()}
             store.finish(task['id'],metadata=metadata);print('GENERATED',task['id'],metadata,flush=True)

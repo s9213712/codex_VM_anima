@@ -12,7 +12,7 @@ VM 透過正常 HTTPS 443 主動拉取生圖任務 → 本機 Anima FastAPI → 
 使用者已確認現有帳號是Workers Free。只使用Free支援的SQLite型Durable Object，不使用R2、KV、付費Queue或升級API。
 官方文件說明Free超額會失敗，沒有Paid方案的超額計價；帳號必須維持Free。不同帳號／日後重新部署須重新確認。
 本程式不聲稱可查詢整個帳號剩餘免費額度。每日UTC最多20個生圖任務、同時1個RUNNING、最多2個未完成、單圖2MiB、任務24小時過期，於下一個請求時清理資料（沒有精確實體刪除時間保障）。
-Agent預設10秒輪詢、最多3小時；單張本機推理最多600秒、遠端lease900秒，不自動重做過期任務。
+Agent預設10秒輪詢，不設固定運作或單張生成時間上限；網路請求保留逾時。新版以進度心跳續租，失聯租約到期後不自動重做任務。
 圖片、prompt會傳至使用者自己的Cloudflare帳號；Cloudflare處理TLS及持久資料，請勿提交敏感內容。
 
 來源：https://developers.cloudflare.com/durable-objects/platform/pricing/

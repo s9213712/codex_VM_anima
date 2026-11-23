@@ -129,6 +129,19 @@ npx wrangler deploy --dry-run
 npm test
 ```
 
+## 七點五、部署副本（RPi5）
+
+```
+s92137@192.168.18.34:~/anima-cloudflare-windows/
+  ├─ anima-cloudflare/（含 .private/，權限 700/600）
+  ├─ anima-easy-updater/
+  └─ README.md / HANDOVER.md
+```
+
+- 2026-11-24 由 Windows 端以 tar + scp 複製，金鑰依使用者指示一併帶過去
+- 已在 Pi 5 上實測 `curl /healthz` 成功（relay READY、agent_recent=true）
+- ⚠️ `agent.key` 在 Pi 上等於「可領取任務」的權限；若不再需要，刪掉該檔即可
+
 ## 八、不可外傳
 
 `.private/*.key`、`.wrangler/`、`vm-pairing/vm-pairing.encrypted.json`、OAuth 憑證

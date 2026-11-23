@@ -327,3 +327,13 @@ npx wrangler deploy
 ## License
 
 Private project. 權重與模型授權依各自來源（Anima / SDXL 等）為準。
+
+### 其他文件
+
+| 文件 | 內容 |
+|---|---|
+| `docs/VM-SETUP.md` | 在 Codex VM（或任何 Linux GPU 機）建置 agent 並接上 relay |
+| `docs/CLOUD-AGENTS.md` | Codex / Claude Code / Jules 雲端 VM 差異與建置步驟 |
+| `docs/GEMINI-VM.md` | 用 Gemini（Jules／Gemini CLI）生 GPU VM 並接上本專案 |
+| `docs/CODEX-TASKS.md` | 可直接貼給 Codex 的 VM 端待辦提示詞 |
+| `AGENTS.md` | 給雲端 coding agent 的專案規則與禁區 |

@@ -1,0 +1,23 @@
+[Unit]
+Description=Anima relay agent
+After=network-online.target comfyui.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/anima
+ExecStart=/usr/bin/python3 /home/ubuntu/anima/agent.py \
+  --relay https://anima.s92137123.workers.dev \
+  --key-file /home/ubuntu/anima/agent.key \
+  --backend comfy \
+  --comfy-url http://127.0.0.1:8188 \
+  --workflow /home/ubuntu/anima/workflow.json \
+  --model-name anima-base-v1.0
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

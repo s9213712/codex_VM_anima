@@ -1,0 +1,45 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  relay:
+    name: relay tests + secret guard + updater integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Block secrets from ever being committed
+        run: node scripts/check-secrets.mjs
+
+      - name: Install relay deps
+        working-directory: anima-cloudflare
+        run: npm ci
+
+      - name: Rebuild inlined UI
+        working-directory: anima-cloudflare
+        run: npm run build:ui
+
+      - name: Fail if generated UI drifted from src/ui.html
+        working-directory: anima-cloudflare
+        run: git diff --exit-code -- src/ui.generated.js
+
+      - name: Unit tests
+        working-directory: anima-cloudflare
+        run: npm test
+
+      - name: Syntax check worker + logic
+        working-directory: anima-cloudflare
+        run: |
+          node --check src/worker.js
+          node --check src/logic.js
+
+      - name: Updater payload integrity
+        run: node -e "const u=require('./anima-easy-updater/update.cjs');const m=u.payload();console.log('integrity PASS',m.version,Object.keys(m.files).length+' files')"

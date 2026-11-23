@@ -1,81 +1,34 @@
-const JSON_HEADERS = {"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"};
-const ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
-class HttpError extends Error { constructor(status,message) {super(message);this.status=status;} }
-const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:JSON_HEADERS});
+import UI_HTML from "./ui.generated.js";
+import { ID, fallbackDecision, FALLBACK_TIMEOUT_MS, HttpError, json, authenticate, bytes, bodyJSON, validJob, safeMetrics, publicJob, agentGate, AGENT_SOFT_MS, AGENT_HARD_MS, LEASE_MS, PENDING_MAX_MS } from "./logic.js";
 
-async function authenticate(request,key) {
-  if (!key || key.length<32) throw new HttpError(503,"Relay secrets not configured");
-  const header=request.headers.get("Authorization") || "";
-  const token=header.startsWith("Bearer ")?header.slice(7):"";
-  if (token.length!==key.length) throw new HttpError(401,"Bearer key required");
-  const encode=new TextEncoder();
-  const [a,b]=await Promise.all([crypto.subtle.digest("SHA-256",encode.encode(token)),crypto.subtle.digest("SHA-256",encode.encode(key))]);
-  let difference=0; const aa=new Uint8Array(a),bb=new Uint8Array(b);
-  for(let i=0;i<aa.length;i++)difference|=aa[i]^bb[i];
-  if(difference)throw new HttpError(401,"Invalid key");
-}
-async function bytes(request,limit) {
-  if(Number(request.headers.get("Content-Length") || 0)>limit)throw new HttpError(413,"Body too large");
-  if(!request.body)return new Uint8Array();
-  const reader=request.body.getReader(),parts=[];let total=0;
-  for(;;){const {done,value}=await reader.read();if(done)break;total+=value.length;
-    if(total>limit){await reader.cancel();throw new HttpError(413,"Body too large");}parts.push(value);}
-  const result=new Uint8Array(total);let offset=0;for(const part of parts){result.set(part,offset);offset+=part.length;}return result;
-}
-async function bodyJSON(request,limit=8192){try{return JSON.parse(new TextDecoder().decode(await bytes(request,limit)));}catch(e){if(e instanceof HttpError)throw e;throw new HttpError(400,"Invalid JSON");}}
-function validJob(input){
-  if(!input || typeof input!=="object" || Array.isArray(input))throw new HttpError(422,"Expected a job object");
-  if(typeof input.prompt!=="string" || !input.prompt.trim() || input.prompt.length>1500)throw new HttpError(422,"prompt must contain 1..1500 characters");
-  const job={prompt:input.prompt,negative_prompt:input.negative_prompt??"low quality, blurry",width:input.width??256,height:input.height??256,steps:input.steps??8,seed:input.seed??42};
-  if(typeof job.negative_prompt!=="string" || job.negative_prompt.length>1000)throw new HttpError(422,"negative_prompt too long");
-  for(const field of ["width","height"])if(!Number.isInteger(job[field])||job[field]<128||job[field]>1024||job[field]%32)throw new HttpError(422,"Dimensions must be 128..1024 and multiples of 32");
-  if(!Number.isInteger(job.steps)||job.steps<1||job.steps>20)throw new HttpError(422,"steps must be 1..20");
-  if(!Number.isInteger(job.seed)||job.seed<0||job.seed>4294967295)throw new HttpError(422,"Invalid seed");
-  // Reject data that could turn this application relay into arbitrary URL/command forwarding.
-  if(Object.keys(input).some(k=>!Object.hasOwn(job,k)))throw new HttpError(422,"Unknown job field");
-  return job;
-}
-function safeMetrics(value){
-  if(!value || typeof value!=="object")return null;
-  const number=x=>typeof x==='number'&&Number.isFinite(x)?x:null;
-  return {sampled_at:number(value.sampled_at),cpu:{visible_cores:number(value.cpu?.visible_cores),quota_cores:number(value.cpu?.quota_cores),quota_usage_percent:number(value.cpu?.quota_usage_percent)},
-    memory:{limit_bytes:number(value.memory?.limit_bytes),used_bytes:number(value.memory?.used_bytes),quota_headroom_bytes:number(value.memory?.quota_headroom_bytes)},
-    disk:{total_bytes:number(value.disk?.total_bytes),used_bytes:number(value.disk?.used_bytes),free_bytes:number(value.disk?.free_bytes)},
-    model:{state:['READY','LOADING','ERROR','STARTING'].includes(value.model?.state)?value.model.state:'UNKNOWN',rss_bytes:number(value.model?.rss_bytes),turbo_lora:value.model?.turbo_lora===true,lora_name:typeof value.model?.lora_name==='string'?value.model.lora_name.slice(0,80):null,guidance_scale:number(value.model?.guidance_scale),default_steps:number(value.model?.default_steps)},
-    api:{uptime_seconds:number(value.api?.uptime_seconds),lease_remaining_seconds:number(value.api?.lease_remaining_seconds)},
-    capabilities:{vm_create:false,vm_wake:false,inference_device:'cpu'}};
-}
-function publicJob(row){return {id:row.id,status:row.status,request:JSON.parse(row.request_json),created:row.created,started:row.started,finished:row.finished,
-  error:row.error,metadata:row.metadata?JSON.parse(row.metadata):null,...(row.status==="SUCCEEDED"?{image_url:`/v1/jobs/${row.id}/image`}:{})};}
+export class AnimaRelayV2 {
 
-export default {
-  async fetch(request,env){
-    try{
-      const path=new URL(request.url).pathname;
-      if(path==="/" && request.method==="GET")return json({service:"Anima HTTPS image-job relay",authentication:"Bearer required",docs:"POST /v1/generations, then poll returned status_url"});
-      await authenticate(request,path.startsWith("/agent/")?env.AGENT_KEY:env.CLIENT_KEY);
-      return await env.RELAY.get(env.RELAY.idFromName("single-approved-image-worker")).fetch(request);
-    }catch(e){return json({error:e instanceof HttpError?e.message:"Relay temporarily unavailable"},e instanceof HttpError?e.status:503);}
-  }
-};
-
-export class AnimaRelay {
   constructor(ctx,env){
     this.ctx=ctx;this.env=env;this.sql=ctx.storage.sql;
     this.sql.exec("CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY,status TEXT NOT NULL,request_json TEXT NOT NULL,created INTEGER NOT NULL,started INTEGER,finished INTEGER,lease TEXT,lease_until INTEGER,error TEXT,metadata TEXT,image BLOB)");
     this.sql.exec("CREATE INDEX IF NOT EXISTS jobs_pending ON jobs(status,created)");
     this.sql.exec("CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY,value TEXT NOT NULL)");
+    try{this.sql.exec("ALTER TABLE jobs ADD COLUMN backend TEXT");}catch(e){}
   }
   rows(query,...args){return this.sql.exec(query,...args).toArray();}
   async fetch(request){
     try{
       const now=Date.now(),path=new URL(request.url).pathname,method=request.method;
       this.sql.exec("DELETE FROM jobs WHERE created < ?",now-86400000);
+      // 代理離線時卡住的任務：PENDING 超時即失敗，避免客戶端無限輪詢與配額浪費
+      this.sql.exec("UPDATE jobs SET status='FAILED',finished=?,error='Agent offline before claim' WHERE status='PENDING' AND created < ?",now,now-PENDING_MAX_MS);
       this.sql.exec("DELETE FROM meta WHERE key LIKE 'progress:%' AND substr(key,10) NOT IN (SELECT id FROM jobs)");
       this.sql.exec("UPDATE jobs SET status='FAILED',finished=?,error='Worker lease expired; resubmit explicitly' WHERE status='RUNNING' AND lease_until < ?",now,now);
       if(path==="/healthz" && method==="GET"){
         const heartbeat=this.rows("SELECT value FROM meta WHERE key='agent'")[0];const agent=heartbeat?JSON.parse(heartbeat.value):null;
-        return json({relay:"READY",agent_recent:!!agent && now-agent.observed_at<60000,agent});
+        const age=agent?Math.max(0,Math.round((now-agent.observed_at)/1000)):null;
+        const pending=this.rows("SELECT count(*) AS n FROM jobs WHERE status='PENDING'")[0].n;
+        const running=this.rows("SELECT count(*) AS n FROM jobs WHERE status='RUNNING'")[0].n;
+        const lastError=this.rows("SELECT error FROM jobs WHERE status='FAILED' AND error IS NOT NULL ORDER BY finished DESC LIMIT 1")[0]?.error ?? null;
+        return json({relay:"READY",agent_recent:!!agent && now-agent.observed_at<60000,agent_age_seconds:age,
+          pending,running,last_error:lastError,
+          fallback_configured:!!this.env.FALLBACK_URL,policy:{soft_queue_seconds:AGENT_SOFT_MS/1000,hard_reject_seconds:AGENT_HARD_MS/1000,lease_seconds:LEASE_MS/1000,pending_max_seconds:PENDING_MAX_MS/1000},
+          agent});
       }
       if(path==="/v1/system" && method==="GET"){
         const entry=this.rows("SELECT value FROM meta WHERE key='agent'")[0];const agent=entry?JSON.parse(entry.value):null;
@@ -84,12 +37,22 @@ export class AnimaRelay {
       }
       if(path==="/v1/generations" && method==="POST"){
         const job=validJob(await bodyJSON(request));
+        const hb=this.rows("SELECT value FROM meta WHERE key='agent'")[0];const hbAgent=hb?JSON.parse(hb.value):null;
+        const gate=agentGate(hbAgent?now-hbAgent.observed_at:null);
+        const route=fallbackDecision(gate,!!this.env.FALLBACK_URL);
+        if(route==="reject")throw new HttpError(503,"Agent offline and no fallback backend configured");
         const active=this.rows("SELECT count(*) AS n FROM jobs WHERE status IN ('PENDING','RUNNING')")[0].n;
         if(active>=2)throw new HttpError(429,"Queue full; retry after an existing task completes");
         const day=now-now%86400000;
         if(this.rows("SELECT count(*) AS n FROM jobs WHERE created>=?",day)[0].n>=20)throw new HttpError(429,"Daily application limit reached (20 jobs UTC)");
-        const id=crypto.randomUUID();this.sql.exec("INSERT INTO jobs(id,status,request_json,created) VALUES(?,'PENDING',?,?)",id,JSON.stringify(job),now);
-        return json({id,status:"PENDING",status_url:`/v1/jobs/${id}`},202);
+        const id=crypto.randomUUID();
+        if(route==="fallback"){
+          this.sql.exec("INSERT INTO jobs(id,status,request_json,created,started,backend) VALUES(?,'RUNNING',?,?,?,'fallback')",id,JSON.stringify(job),now,now);
+          this.ctx.waitUntil(this.runFallback(id,job));
+          return json({id,status:"RUNNING",backend:"fallback",status_url:`/v1/jobs/${id}`},202);
+        }
+        this.sql.exec("INSERT INTO jobs(id,status,request_json,created,backend) VALUES(?,'PENDING',?,?,'primary')",id,JSON.stringify(job),now);
+        return json({id,status:"PENDING",backend:"primary",status_url:`/v1/jobs/${id}`,queued_while_agent_offline:gate==="queue"},202);
       }
       let match=path.match(new RegExp(`^/v1/jobs/(${ID})(/image)?$`));
       if(match && method==="GET"){
@@ -106,9 +69,9 @@ export class AnimaRelay {
         if(path==="/agent/heartbeat")return json({ok:true});
         if(input.ready!==true)return json({job:null});
         if(this.rows("SELECT id FROM jobs WHERE status='RUNNING' LIMIT 1").length)return json({job:null});
-        const row=this.rows("SELECT * FROM jobs WHERE status='PENDING' ORDER BY created,id LIMIT 1")[0];if(!row)return json({job:null});
-        const lease=crypto.randomUUID();this.sql.exec("UPDATE jobs SET status='RUNNING',started=?,lease=?,lease_until=? WHERE id=?",now,lease,now+2100000,row.id);
-        return json({job:{id:row.id,request:JSON.parse(row.request_json),lease,lease_until:now+2100000}});
+        const row=this.rows("SELECT * FROM jobs WHERE status='PENDING' AND (backend IS NULL OR backend='primary') ORDER BY created,id LIMIT 1")[0];if(!row)return json({job:null});
+        const lease=crypto.randomUUID();this.sql.exec("UPDATE jobs SET status='RUNNING',started=?,lease=?,lease_until=? WHERE id=?",now,lease,now+LEASE_MS,row.id);
+        return json({job:{id:row.id,request:JSON.parse(row.request_json),lease,lease_until:now+LEASE_MS}});
       }
       match=path.match(new RegExp(`^/agent/jobs/(${ID})/progress$`));
       if(match && method==='POST'){
@@ -148,4 +111,42 @@ export class AnimaRelay {
       throw new HttpError(404,"Unknown application endpoint");
     }catch(e){return json({error:e instanceof HttpError?e.message:"Relay storage operation failed"},e instanceof HttpError?e.status:503);}
   }
+
+  async runFallback(id,job){
+    const base=this.env.FALLBACK_URL;
+    try{
+      if(!base)throw new Error("Fallback not configured");
+      const headers={"Content-Type":"application/json"};
+      if(this.env.FALLBACK_KEY)headers["Authorization"]="Bearer "+this.env.FALLBACK_KEY;
+      const res=await fetch(base.replace(/\/+$/,"")+"/generate",{method:"POST",headers,body:JSON.stringify(job),signal:AbortSignal.timeout(FALLBACK_TIMEOUT_MS)});
+      if(!res.ok)throw new Error("Fallback HTTP "+res.status);
+      const buf=new Uint8Array(await res.arrayBuffer());
+      if(buf.length<8 || [137,80,78,71,13,10,26,10].some((x,i)=>buf[i]!==x))throw new Error("Fallback did not return a PNG");
+      const digest=await crypto.subtle.digest("SHA-256",buf);
+      const sha=Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,"0")).join("");
+      const metadata={engine:"fallback",endpoint:base,sha256:sha,finished_at:Date.now()};
+      this.sql.exec("UPDATE jobs SET status='SUCCEEDED',finished=?,metadata=?,image=? WHERE id=?",Date.now(),JSON.stringify(metadata),buf.buffer,id);
+    }catch(e){
+      this.sql.exec("UPDATE jobs SET status='FAILED',finished=?,error=? WHERE id=?",Date.now(),String(e.message||e).slice(0,2000),id);
+    }
+  }
 }
+
+export default {
+  async fetch(request,env){
+    try{
+      const path=new URL(request.url).pathname;
+      if((path==="/ui"||path==="/ui/"||path==="/index.html") && request.method==="GET"){
+        if(path!=="/ui")return Response.redirect(new URL("/ui",request.url).toString(),308);
+        return new Response(UI_HTML,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});
+      }
+      if(path==="/" && request.method==="GET"){
+        if((request.headers.get("Accept")||"").includes("text/html"))return new Response(UI_HTML,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});
+        return json({build:"v2-liveness",service:"Anima HTTPS image-job relay",authentication:"Bearer required",ui:"/ui",docs:"POST /v1/generations, then poll returned status_url"});
+      }
+      await authenticate(request,path.startsWith("/agent/")?env.AGENT_KEY:env.CLIENT_KEY);
+      return await env.RELAY.get(env.RELAY.idFromName(env.RELAY_INSTANCE || "single-approved-image-worker-v3")).fetch(request);
+    }catch(e){return json({error:e instanceof HttpError?e.message:"Relay temporarily unavailable"},e instanceof HttpError?e.status:503);}
+
+  }
+};

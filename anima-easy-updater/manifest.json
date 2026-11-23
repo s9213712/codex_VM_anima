@@ -1,5 +1,5 @@
 {
-  "version": "2026.11.23-turbo8",
+  "version": "2026.11.24-relay2",
   "files": {
     "client/anima_client.py": "40046386a408ca7a9c59390e1efd615376f91a64037f56e7b0a3de246adf71ab",
     "client/cloud_task.py": "1d45cafe60060e9d7c1ce33948803ee2fcf94c20c3857517d6d22d48098ad729",
@@ -8,8 +8,17 @@
     "client/github_transport.py": "a8bf58bac21a93744f4fbd6ebf50a79812fc10ade416f188b26b7742427e7af7",
     "client/installed-version.json": "f7ffc9e8787e1988984f88ee76fc04b1b25dc6d85215f9bdfa8258c7ae2b2fc9",
     "client/start-windows.bat": "04467c81e4aca552b9d9c61c0a00347f209c0b6128024720b4819450bd10d859",
+    "relay/src/worker.js": "a4bd088081cf5f3237572c2a5c54fe15fff1a4ac2ea33765b5136c50a1e22f4c",
+    "relay/src/logic.js": "ce12ec9c0aeb9eb82de351347af689ddde5ef3128327475e6411623a84538b31",
+    "relay/src/ui.html": "caf24c0f9e468567a2513147d49610feeefc8de413f66a355a0003d120618546",
+    "relay/src/ui.generated.js": "6d15468dbd8fd2337cc575ad5cf5b361d40f6cc68a8fcad2ec56a9e8bda59e0f",
+    "relay/package.json": "7f472f8cc6654ede56500f9a7dba5bb226cef16bb0ae9c218cb75e54b30c75c8",
     "relay/package-lock.json": "b113f80de8bc3a6b40ab949f2bd3be4f00b27075d3664d2506dcdc66ac9f4fe7",
-    "relay/package.json": "7cc738ceebc65888a1f2136e892c6c974a1a2cdb8f594cdd60953024b7dc5efb",
-    "relay/src/worker.js": "34aef2cb6cd3da649dd0a3dfc0e677c9b11c047d437ac6ac8946b5d00f2225a5"
+    "relay/wrangler.jsonc": "0785c449292d5afa10c4122a10721ea86fc46970152201633330279e7092787c",
+    "relay/test/relay.test.js": "ec26061618c80949bd63793621568b0e3e668db4ae98edbbbc46efa26ed5b6f2",
+    "relay/scripts/build-ui.mjs": "c5b2116a24b86698309b01c761d0c9f2652166f4fb693c1cfb8bfcfe5039a927",
+    "relay/scripts/health.mjs": "df33e447228a2a975e3725ec42816760305ee1a13926b5981cc4a2cb8b87df63",
+    "relay/vm/agent.py": "4ea057027a878fcdd5860f0f35d3060ee879f8626f576efc0e3be2d74df6662c",
+    "relay/bridge/comfy_bridge.py": "31a7c396b13904b4aafa3fd047239efcda43447e35ea07fc8c9028f094346105"
   }
 }

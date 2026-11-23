@@ -75,10 +75,10 @@ def main():
     download=sub.add_parser('download');download.add_argument('id');download.add_argument('--output',required=True)
     a=p.parse_args()
     try:
-        config_file=Path(__file__).with_name('connection.json');config=json.loads(config_file.read_text()) if config_file.exists() else {}
+        config_file=Path(__file__).with_name('connection.json');config=json.loads(config_file.read_text(encoding='utf-8')) if config_file.exists() else {}
         repo=a.repo or (config.get('repo') if not a.api else None)
         if repo:client=GitHub(repo)
-        elif a.api and a.key_file:client=API(a.api,a.key_file.read_text().strip(),a.local_test)
+        elif a.api and a.key_file:client=API(a.api,a.key_file.read_text(encoding='utf-8').strip(),a.local_test)
         else:raise ClientError('Configure a private repository, or provide --api and --key-file')
         if a.command=='resources':
             if not 0<=a.watch<=60:raise ClientError('--watch must be 0..60 seconds')

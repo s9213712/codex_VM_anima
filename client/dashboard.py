@@ -32,7 +32,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self.check_host():self.send_data({'error':'Invalid local Host'},403);return
         path=urllib.parse.urlparse(self.path).path
         if path=='/':
-            page=Path(__file__).with_name('dashboard.html').read_text().replace('__LOCAL_NONCE__',self.server.nonce)
+            page=Path(__file__).with_name('dashboard.html').read_text(encoding='utf-8').replace('__LOCAL_NONCE__',self.server.nonce)
             self.send_data(page.encode(),mime='text/html; charset=utf-8');return
         if not self.authorized():return
         try:
@@ -62,7 +62,7 @@ class Handler(BaseHTTPRequestHandler):
                 repo=self.server.config['repo'];branch=self.server.config.get('source_branch','work/anima-restore')
                 task='Run the approved Anima image inbox in this repository. Do not enable paid resources, merge main, or read secret file contents. Use the provided credentials normally. Run scripts/install.sh, start scripts/start.sh in a bounded terminal, then run .venv/bin/python github_queue/worker.py --repo '+repo+' --seconds 2400. Stay within the provider task lifetime and report actual failures. Do not claim a VM was created before work starts.'
                 with tempfile.TemporaryDirectory() as temporary:
-                    file=Path(temporary)/'task.txt';file.write_text(task)
+                    file=Path(temporary)/'task.txt';file.write_text(task,encoding='utf-8')
                     result=subprocess.run([sys.executable,str(Path(__file__).with_name('cloud_task.py')),'submit-task','--env',env,'--branch',branch,'--task-file',str(file)],capture_output=True,text=True,timeout=120)
                 if result.returncode:raise ClientError('Cloud task not submitted; verify the environment and native ChatGPT CLI login using cloud_task.py probe')
                 self.send_data({'status':'CLOUD_TASK_SUBMITTED','output':result.stdout[:3000],'note':'Task acceptance does not prove this VM is awake'});return
@@ -73,7 +73,7 @@ def main():
     p=argparse.ArgumentParser();p.add_argument('--config',type=Path,default=Path(__file__).with_name('connection.json'));p.add_argument('--port',type=int,default=0);p.add_argument('--no-browser',action='store_true');p.add_argument('--seconds',type=int,default=10800);a=p.parse_args()
     if not 10<=a.seconds<=10800:p.error('Client lifetime must be 10..10800 seconds')
     if not a.config.exists():raise SystemExit('Connection configuration missing; use the supplied client package')
-    config=json.loads(a.config.read_text());client=GitHub(config['repo']) if config.get('backend')=='github' else API(config['api'],Path(config['key_file']).read_text().strip())
+    config=json.loads(a.config.read_text(encoding='utf-8'));client=GitHub(config['repo']) if config.get('backend')=='github' else API(config['api'],Path(config['key_file']).read_text(encoding='utf-8').strip())
     server=LocalServer(('127.0.0.1',a.port),client,config);url='http://127.0.0.1:'+str(server.server_port)
     print('Anima local client:',url,flush=True)
     timer=threading.Timer(a.seconds,server.shutdown);timer.daemon=True;timer.start()

@@ -61,10 +61,10 @@
   <section class="card hidden" id="loginCard" style="margin-bottom:16px">
     <h2>連線</h2>
     <label>Relay 網址</label>
-    <input id="url" type="text" placeholder="https://anima.xxx.workers.dev">
+    <input id="url" type="text" placeholder="https://anima.xxx.workers.dev" readonly>
     <label>Client Key（存在此瀏覽器，不會上傳到別處）</label>
     <input id="key" type="password" placeholder="貼上 client.key 內容">
-    <div class="hint">金鑰只會用來呼叫上面的 relay，存在 localStorage。</div>
+    <div class="hint">網址會自動帶入目前網域；金鑰只存在這台裝置的 localStorage，可按「清除」移除。</div>
     <div style="margin-top:12px;display:flex;gap:8px">
       <button class="primary" id="save">儲存並連線</button>
       <button id="clear">清除</button>
@@ -132,7 +132,7 @@
 <script>
 const $ = id => document.getElementById(id);
 const LS = { url:"anima.url", key:"anima.key", jobs:"anima.jobs" };
-let cfg = { url: localStorage.getItem(LS.url) || "", key: localStorage.getItem(LS.key) || "" };
+let cfg = { url: localStorage.getItem(LS.url) || (location.protocol==="https:"?location.origin:""), key: localStorage.getItem(LS.key) || "" };
 let jobs = JSON.parse(localStorage.getItem(LS.jobs) || "[]");
 let timer = null;
 

@@ -1,6 +1,6 @@
 # Resolution and progress update — 2026-11-23
 
-Implemented independent width/height, 128–1024 in multiples of 32. CLI --size remains backward compatible; --width/--height override each axis. Browser includes aspect presets, swap, numeric steps 1–20, seed randomization and JSON parameter export. No unsupported sampler/CFG/LoRA control is presented as functional.
+Implemented independent width/height, 128–1024 in multiples of 32. CLI --size remains backward compatible; --width/--height override each axis. Browser includes aspect presets, swap, numeric steps 1–20, seed randomization and human-readable text parameter export. No unsupported sampler/CFG/LoRA control is presented as functional.
 
 Worker wraps its own scheduler.step instance during a job and restores it in finally. A completed scheduler step is persisted to SQLite, exposed through authenticated API, forwarded with the job lease to Cloudflare and polled every five seconds. The zero-step phase covers preparation and waiting for the first scheduler step; it does not claim separate measurement of text encoding. Completed-step, decoding and saving states are reported separately. This is scalar progress, not a live intermediate-image preview. Estimated remaining denoising time uses observed completed-step elapsed time and is labeled an estimate. Timings include initial encoding; not a completion guarantee.
 

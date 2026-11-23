@@ -1,1 +1,1 @@
-{"backend":"github","repo":"s9213712/anima-vm-jobs","source_branch":"work/anima-restore","state_branch":"anima-jobs","codex_environment_id":""}
+{"backend":"http","api":"https://anima.s92137123.workers.dev","key_file":"../.private/client.key","codex_environment_id":""}

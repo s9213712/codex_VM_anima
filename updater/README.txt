@@ -32,3 +32,8 @@ No paid plan upgrade, VM creation, or VM wake action is implemented.
 
 History update: cloud order list, search/filter, lazy previews and parameter reuse.
 Updates preserve history-data. Select mode2 to deploy the history API too.
+
+Preferred: clone the public repository and double-click Update-From-Git.bat.
+That path pulls latest reviewed branch automatically, remembers installation,
+uses existing OAuth only and starts no login. Invalid credentials stop updates.
+Normal updates do not need fresh ZIPs, Account ID or approval prompts.

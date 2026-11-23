@@ -1,5 +1,7 @@
 # Anima HTTPS 生圖工作中繼
 
+目前主要操作方式是 Windows 官方 OAuth 部署及 Git 更新，見 [完整教程](../docs/WINDOWS_GUIDE.md)。下列 Environment Secrets/管理 Token 流程是可選替代，不是一般使用者的必要步驟；早期網路測試紀錄不代表目前服務狀態。
+
 外部使用者 → Cloudflare Worker → SQLite Durable Object 任務佇列。
 VM 透過正常 HTTPS 443 主動拉取生圖任務 → 本機 Anima FastAPI → 將 PNG 上傳回中繼。
 

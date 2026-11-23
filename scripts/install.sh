@@ -6,7 +6,7 @@ mkdir -p .state .cache .tools docs/evidence
 chmod 700 .state
 export UV_CACHE_DIR="$ROOT/.cache/uv"
 uv sync --frozen
-curl --fail --silent --show-error --location --max-time 30 'https://huggingface.co/api/models/circlestone-labs/Anima-Base-v1.0-Diffusers/revision/073c3a9db359c31ad0e8aa268d15775473c2176c?blobs=true' -o docs/evidence/model-info.json
+curl --fail --silent --show-error --location --max-time 30 'https://huggingface.co/api/models/circlestone-labs/Anima-Base-v1.0-Diffusers/revision/073c3a9db359c31ad0e8aa268d15775473c2176c?blobs=true' -o .state/model-info.json
 .venv/bin/python scripts/download.py
 .venv/bin/python scripts/install-turbo.py
 HASH=97bb3b02d23a5980fc9c15a1a270e692da1923f103f920d5b16d4931d5ab55e7

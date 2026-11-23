@@ -1,13 +1,13 @@
 {
-  "version": "2026.11.23-history",
+  "version": "2026.11.23-git",
   "files": {
     "client/anima_client.py": "5adee14e896a41aa5851e4d1e557142deeb7e372eace5ea3545fc4c4f4fcbae3",
     "client/cloud_task.py": "1d45cafe60060e9d7c1ce33948803ee2fcf94c20c3857517d6d22d48098ad729",
-    "client/dashboard.html": "53d88e44a698271752dd9203bcbd053b0c8e56b196e5f518c2c16bdf85e788c3",
+    "client/dashboard.html": "66c12b63f8fb7414aef6f52fcf9afc7646a26f9623c268f06bba0af5d0eb8103",
     "client/dashboard.py": "418a6b3c506842a9da4cdb2e1085387b2117cf6ac0b16e7545280afe6b4e003a",
     "client/github_transport.py": "a8bf58bac21a93744f4fbd6ebf50a79812fc10ade416f188b26b7742427e7af7",
     "client/history.py": "1ea261c56caa4c474fafdf9f7f2ee8d41eaacf69faedce999652040733900a4f",
-    "client/installed-version.json": "5c0bff081c4ae4e73649f916fcb9dc475103da969622ce791aa94d3d21d34030",
+    "client/installed-version.json": "d297ab8f8965888950480bc29b679a0c6adfeb1aabec3ffa1f417c7d1dd46fac",
     "client/start-windows.bat": "04467c81e4aca552b9d9c61c0a00347f209c0b6128024720b4819450bd10d859",
     "relay/package-lock.json": "b113f80de8bc3a6b40ab949f2bd3be4f00b27075d3664d2506dcdc66ac9f4fe7",
     "relay/package.json": "7cc738ceebc65888a1f2136e892c6c974a1a2cdb8f594cdd60953024b7dc5efb",

@@ -16,3 +16,14 @@ error.log
 .dry-run/
 
 history-data/
+
+# Optional external agent skills and local Git-update state
+.agents/
+skills-lock.json
+AnimaUpdater/
+anima-client/
+
+*-private.pem
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm

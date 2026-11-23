@@ -1,55 +1,123 @@
-# Anima CPU API — 恢復版
+# Anima VM Studio
 
-真實 CPU BF16 Diffusers 生圖 API。模型固定 `circlestone-labs/Anima-Base-v1.0-Diffusers`，revision `073c3a9db359c31ad0e8aa268d15775473c2176c`。
-個人非商業模型服務測試，無租用GPU或付費API。不可把本專案當24小時永久VPS。
+在 Codex 雲端 VM 以 CPU 執行 **Anima Base v1.0 + Turbo LoRA v0.2**，透過 Cloudflare HTTPS 中繼接收圖片任務；Windows 客戶端可送單、查看真實進度、預覽歷史圖片及下載結果。
 
-```bash
-./scripts/install.sh
-./scripts/start.sh
+本儲存庫只保存程式、測試與文件，**不包含 API 金鑰、OAuth 資料、模型權重、個人任務或私人圖片**。公開原始碼不代表 API 可匿名使用。
+
+> VM 是暫時開發環境，平台可隨時暫停或重建。這不是常開主機，客戶端不能喚醒它。沒有啟用付費模型 API 或付費雲端主機；Cloudflare 帳號須維持 Workers Free。免費方案有額度與限制。
+
+## 教程入口
+
+- **[Windows 完整操作教程](docs/WINDOWS_GUIDE.md)**：已有安裝改用 Git、首次安裝、更新、操作、錯誤排除。
+- **[VM 建置與恢復教程](docs/VM_GUIDE.md)**：安裝模型、啟動、加密配對、恢復、檢查與故障處理。
+- [歷史單與快取](docs/HISTORY_PREVIEWS.md)、[尺寸與進度](docs/RESOLUTION_PROGRESS_UPDATE.md)。
+- [Cloudflare 中繼技術說明](relay/README.md)、[模型授權](docs/MODEL_LICENSE.md)。
+
+## 已有安裝：改成 Git 更新
+
+在 **Windows 電腦**安裝 Git、Node.js 22+；Python 3.10+ 供客戶端使用。先在 PowerShell 執行一次：
+
+```powershell
+git clone --branch work/anima-restore https://github.com/s9213712/codex_VM_anima.git D:\AnimaSource
 ```
 
-Python3.12／uv／curl／flock，Debian x86_64。Torch及Torchvision只用官方CPU index；依賴由uv.lock鎖定。
-模型使用safetensors並驗證官方LFS SHA256；不啟用模型remote code。
-API在127.0.0.1:8765，只有一個worker；SQLite任務可跨程序保存，但VM重建後本地資料不保證保留。
-首次啟動建立.state/api.key（0600）；不顯示、不提交。重複啟動由flock擋下，不會誤啟第二個大型模型。
+往後關閉舊客戶端，雙擊 `D:\AnimaSource\Update-From-Git.bat`：
 
-```bash
-.venv/bin/python scripts/client.py --prompt 'anime scenery, a red cabin beside a mountain lake, sunrise' --output example.png
+1. 從核對過的 GitHub origin 拉取 `work/anima-restore`，只允許 fast-forward。
+2. 第一次選原本含 `.private` 的 **應用程式安裝資料夾**，例如 `D:\anima-cloudflare-windows\anima-cloudflare`。與 Git 原始碼資料夾分開。
+3. 程式直接更新客戶端與既有 `anima` Worker，不重填設定、不重複確認一般更新選項；帳號須繼續維持 Free。
+4. 沿用 Cloudflare 登入，例行更新不開啟登入；若憑證失效則停止，由你另行修復登入。
+5. 更新成功後，雙擊應用程式資料夾的 `anima-client\start-windows.bat`。
+
+更新工具保存金鑰、連線設定、圖片歷史及本機備份；不重啟 VM、不重送任務、不合併 main、不升級付費方案。Git checkout 若有修改或分岔會停止，**不會強制 reset**。Git 更新成功與 Cloudflare 部署成功是兩件事，請以最後的 DONE 與驗證結果為準。
+
+公開 repo 的唯讀下載不需要 GitHub Token；Git 直接取得公開來源，不需要 GitHub CLI 或 GitHub 登入。日後改成私人 repo 時，先用自己的憑證管理器或官方 gh 完成一次登入；更新器只使用已保存憑證，失效時停止，不會偷偷發起新登入。
+
+## 功能
+
+| 功能 | 說明 |
+|---|---|
+| 模型 | Base v1.0；指定 Turbo v0.2，強度 1、CFG 1、Euler，預設 8 步 |
+| 尺寸 | 寬高分別 128–1024，32 的倍數；1–20 步 |
+| 任務 | 真實 CPU 推理，非同步排隊、檢查 SHA256、PNG 下載 |
+| 進度與日誌 | 真實 scheduler 步數、階段、耗時、每單原始日誌尾端 |
+| 資源圖表 | CPU、記憶體、磁碟快照折線圖；離線處不補造資料 |
+| 歷史 | 雲端保留約 24 小時；本機紀錄、縮圖、搜尋、帶回參數 |
+| 更新 | Git 拉取、固定 payload 校驗、應用檔案備份與本機回復 |
+| 認證 | CLIENT_KEY 與 AGENT_KEY 分離；本機 UI 有 Host/Origin/session 檢查 |
+
+前台用中文欄位、卡片及圖片顯示資訊，不把 API JSON 原始回應當使用介面。JSON 僅用於內部 API、設定與開發證據。匯出參數為一般文字。
+
+## 運作方式
+
+```mermaid
+flowchart LR
+    PC[Windows 本機介面] -->|HTTPS / CLIENT_KEY| CF[Cloudflare Worker]
+    CF --> DO[SQLite Durable Object]
+    VM[VM 接單程序] -->|HTTPS 主動領單 / AGENT_KEY| CF
+    VM --> API[127.0.0.1:8765 API]
+    API --> MODEL[Anima CPU + Turbo LoRA]
+    VM -->|PNG / 進度 / 日誌| CF
+    CF -->|下載 / 預覽| PC
 ```
 
-- GET /healthz：真實就緒狀態與模型程序RSS觀測。
-- POST /v1/generations：需Bearer；202回任務id與status_url。
-- GET /v1/jobs/{uuid}：需Bearer，PENDING／RUNNING／SUCCEEDED／FAILED。
-- GET /v1/jobs/{uuid}/image：需Bearer，成功後下載PNG。
-- /docs：OpenAPI。不能以URL query傳key。
+這是固定格式的圖片任務中繼，不是任意 URL、SSH 或 shell 代理。GitHub 只保存與更新程式；目前正常生圖任務走 Cloudflare，不需要 GitHub Issue 或 Actions。
 
-CPU4執行緒，預設256×256、8steps，長寬各128–1024且32倍數，steps1–20。單張不設固定逾時、worker 12GiB RSS、佇列容量2、每個DB最多20次任務。
-API不設固定運作時間；平台仍可停止VM，舊Tunnel工具另有自己的限制。模型載入也不設固定逾時；仍保留記憶體限制與明確錯誤處理。服務重啟會將中斷任務明確標失敗，需使用者重新送出。
-外部API採非同步202避免CPU推理期間佔用長HTTP請求。金鑰與原始資料請放適當秘密儲存；免費不等於公開端點無濫用風險。
+## 目錄
 
-## Cloudflare 開通
+| 路徑 | 用途 |
+|---|---|
+| `anima_api/` | VM API、SQLite 佇列、模型程序、資源量測 |
+| `relay/` | Cloudflare Worker、接單 Agent、本機整合測試 |
+| `client/` | 客戶端、UI、圖片與歷史快取；來源設定不含金鑰 |
+| `windows-relay/` | Windows 首次 Cloudflare 部署資產 |
+| `updater/` | 更新程式與經雜湊核對的應用 payload |
+| `scripts/` | 安裝、Git 更新、模型下載及檢查工具 |
+| `tests/`、`docs/` | 測試、教程與明確標示的歷史實測證據 |
+| `github_queue/` | 先前的可選私人 GitHub 收件匣；正常模式不使用 |
 
-[完整管理員申請清單](docs/NETWORK_OPENING_REQUEST.md)。本機程式存在不代表已公開。
-目前沒有Named Tunnel Secret、公開portal或新增網路許可。Quick Tunnel API先前回403；沒有繞過封鎖。
+## VM 快速啟動
 
-網路許可及帳號既有hostname準備好後，將token以秘密檔掛載並設定TUNNEL_TOKEN_FILE，再執行：
+Linux x86_64、Python 3.12、uv、curl、flock，需模型下載網路權限及足夠磁碟/RAM：
 
 ```bash
-./scripts/tunnel.sh named
+bash scripts/install.sh
+bash scripts/start.sh
 ```
 
-只有平台允許Quick Tunnel API及edge連線後，才使用 `./scripts/tunnel.sh quick`。
-不要貼Token到對話，不需DuckDNS，不購買網域或啟用付費方案。
+另開 VM 終端，安全配對完成後：
 
-## 測試及持久保存
+```bash
+export ANIMA_RELAY_URL='https://你的實際Worker網址'
+export ANIMA_RELAY_AGENT_KEY_FILE='/workspace/anima-server/.state/relay-agent.key'
+.venv/bin/python relay/agent.py
+```
 
-`.venv/bin/pytest -q` 驗證API、參數、佇列、重啟；它不載入模型，不能替代真實生圖測試。
-當次實際API生成結果記錄在docs/evidence；歷史結果不會冒充此次實測。
-原始碼zip排除模型cache、SQLite、token及API key；請另存使用者指定的外部儲存，否則仍可能在VM重建後遺失。
+不要把金鑰放在參數、URL、提示詞或 Git。完整部署與配對請看教程；單跑上述程式不會自動取得 Cloudflare 憑證。
 
-## HTTPS 圖片工作中繼
+## 限制與已知行為
 
-已新增 [relay/README.md](relay/README.md)：外部HTTP提交 → Cloudflare Worker／SQLite DO → VM主動拉取 → 真實Anima生成 → PNG上傳／下載。
-固定圖片schema、不同角色金鑰、lease、每日20任務、重送去重。它使用普通HTTPS443，沒有通用TCP／命令轉送。
-本機Miniflare與真實Anima的端到端測試已成功；公開Worker尚未部署，仍需Cloudflare Account ID與最小權限Token以Environment Secrets提供。
-使用者已確認Workers Free，不啟用付費功能。實際workers.dev端點的可達性仍須公開部署後驗證。
+- 只有 CPU；大尺寸可能很慢。單張推理不設固定時間上限，但 VM 平台可停止它，程序仍有 12GiB RSS 限制。
+- API 僅綁 localhost。佇列最多 2 筆；開發 DB 最多 20 筆任務，達上限需人工檢視，不自動刪庫。
+- Cloudflare 每 UTC 日最多 20 單；每張 PNG 最大 2MiB；約 24 小時到期，在下次請求清理。失聯租約會失效；活躍 Agent 透過進度續租。
+- 本機最多保存 1000 筆紀錄、顯示最近 200 筆、圖片快取 100MiB，達上限不自動刪舊圖。
+- CFG 1 下負面提示詞不參與引導。去噪 100% 不代表解碼與儲存完成。
+- VM 磁碟及 `.state` 不保證跨重建保存。Cloudflare API 及公開原始碼無法喚醒 VM。
+- Windows 更新器與部署仍需使用者帳號操作；本專案不宣稱有 Windows 實機自動化驗收或全天候在線保證。
+
+## 測試與開發
+
+```bash
+.venv/bin/python -m pytest -q
+(cd relay && npm ci --ignore-scripts && npm test)
+node --test updater/update.test.cjs
+python scripts/build-updater.py
+```
+
+修改 `client/` 或 `relay/` 後，務必重新建置 payload、跑測試，再提交工作分支。否則 Git 原始碼與安裝版本可能不同。
+
+截至 2026-11-23：21 項 Python、8 項 Miniflare 與更新器備份/回復測試通過。真實模型驗證另記於 `docs/evidence/`：768×512 單步、Turbo 256×256 八步約 74 秒。這些是指定當次量測，不能當作所有任務的速度保證；1024 大圖沒有固定完成時間承諾。
+
+## 資安與授權
+
+絕不提交 `.private/`、`.state/`、`.env`、OAuth 設定、模型權重、資料庫或個人圖片。請自行保護應用程式資料夾及本機備份。模型與 LoRA 使用各自授權，GitHub 原始碼公開不改變模型授權條件。

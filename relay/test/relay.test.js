@@ -53,3 +53,12 @@ test('daily application budget stops the 21st generation',()=>harness(async req=
  }
  assert.equal((await submit(req,{prompt:'over limit'})).status,429);
 }));
+
+test('resource view needs client auth, reports timestamp and filters unapproved fields',()=>harness(async req=>{
+ assert.equal((await req('/v1/system')).status,503);
+ const snapshot={sampled_at:Date.now()/1000,cpu:{quota_cores:4,visible_cores:5,quota_usage_percent:25},memory:{limit_bytes:16000,used_bytes:6000,quota_headroom_bytes:10000},disk:{total_bytes:32000,used_bytes:10000,free_bytes:22000},model:{state:'READY',rss_bytes:5500},api:{uptime_seconds:60,lease_remaining_seconds:10000},env:{SECRET:'must never forward'},capabilities:{vm_create:true}};
+ assert.equal((await req('/agent/heartbeat',{key:AGENT,method:'POST',body:JSON.stringify({ready:true,system:snapshot})})).status,200);
+ const response=await req('/v1/system');assert.equal(response.status,200);const result=await response.json();
+ assert.equal(result.cpu.quota_cores,4);assert.equal(result.agent_recent,true);assert.equal(result.capabilities.vm_create,false);
+ assert.equal(JSON.stringify(result).includes('must never forward'),false);assert.ok(result.snapshot_age_seconds>=0);
+}));

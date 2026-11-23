@@ -28,6 +28,11 @@ def validate_url(url,allow_local=False):
     if allow_local and parsed.scheme=='http' and parsed.hostname in ('127.0.0.1','localhost') and parsed.path in ('','/'):return url.rstrip('/')
     raise ValueError('Public relay requires HTTPS; localhost is available only with explicit --local-test')
 
+def resources(local):
+    try:
+        r=local.get('/v1/system');r.raise_for_status();return r.json()
+    except httpx.HTTPError:return None
+
 def execute(remote,local,job,session_deadline):
     ident=str(uuid.UUID(job['id']));lease=str(uuid.UUID(job['lease']));data=checkpoint(ident,lease=lease,lease_until=job['lease_until'],request=job['request'])
     lease_headers={'X-Lease-Token':lease}
@@ -55,7 +60,7 @@ def execute(remote,local,job,session_deadline):
                     if attempt==2:raise
                     time.sleep(2**attempt)
         if time.monotonic()-heartbeat>15:
-            ping=remote.post('/agent/heartbeat',json={'ready':True,'busy':True});ping.raise_for_status();heartbeat=time.monotonic()
+            ping=remote.post('/agent/heartbeat',json={'ready':True,'busy':True,'system':resources(local)});ping.raise_for_status();heartbeat=time.monotonic()
         time.sleep(5)
     raise TimeoutError('Local generation polling deadline exceeded')
 
@@ -82,7 +87,7 @@ def main():
             job=None
             try:
                 health=local.get('/healthz');health.raise_for_status();ready=health.json()['ready']
-                response=remote.post('/agent/claim',json={'ready':ready});response.raise_for_status();job=response.json().get('job')
+                response=remote.post('/agent/claim',json={'ready':ready,'system':resources(local)});response.raise_for_status();job=response.json().get('job')
                 if job:
                     # The server supplies only the strictly validated image schema, never commands or destination URLs.
                     execute(remote,local,job,deadline)

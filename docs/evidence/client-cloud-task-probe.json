@@ -1,0 +1,12 @@
+{
+  "cli_version": "codex-cli 0.172.0-alpha.2",
+  "task_dispatch_command_present": true,
+  "login_reports_chatgpt": true,
+  "cloud_access_verified": false,
+  "note": "Cloud account access not verified; sign in on this device and recheck",
+  "vm_create": false,
+  "vm_wake": false,
+  "same_vm_reuse_guaranteed": false,
+  "remaining_codex_quota": null,
+  "automatic_paid_fallback": false
+}

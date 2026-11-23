@@ -1,0 +1,12 @@
+{
+  "native_endpoint": "authenticated /v1/system verified on current VM",
+  "standalone_watch_exit": 0,
+  "relay_scope": "local Miniflare integration, not public Cloudflare",
+  "native_model_state": "READY",
+  "cpu_quota_cores": 4.0,
+  "memory_limit_bytes": 17179869184,
+  "relay_snapshot_age_seconds": 14.82668423652649,
+  "vm_create_supported": false,
+  "vm_wake_supported": false,
+  "codex_cloud_task_dispatch": "official experimental CLI exists; actual read-only authentication check failed 401; no task submitted"
+}

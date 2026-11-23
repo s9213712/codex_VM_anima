@@ -35,6 +35,16 @@ function validJob(input){
   if(Object.keys(input).some(k=>!Object.hasOwn(job,k)))throw new HttpError(422,"Unknown job field");
   return job;
 }
+function safeMetrics(value){
+  if(!value || typeof value!=="object")return null;
+  const number=x=>typeof x==='number'&&Number.isFinite(x)?x:null;
+  return {sampled_at:number(value.sampled_at),cpu:{visible_cores:number(value.cpu?.visible_cores),quota_cores:number(value.cpu?.quota_cores),quota_usage_percent:number(value.cpu?.quota_usage_percent)},
+    memory:{limit_bytes:number(value.memory?.limit_bytes),used_bytes:number(value.memory?.used_bytes),quota_headroom_bytes:number(value.memory?.quota_headroom_bytes)},
+    disk:{total_bytes:number(value.disk?.total_bytes),used_bytes:number(value.disk?.used_bytes),free_bytes:number(value.disk?.free_bytes)},
+    model:{state:['READY','LOADING','ERROR','STARTING'].includes(value.model?.state)?value.model.state:'UNKNOWN',rss_bytes:number(value.model?.rss_bytes)},
+    api:{uptime_seconds:number(value.api?.uptime_seconds),lease_remaining_seconds:number(value.api?.lease_remaining_seconds)},
+    capabilities:{vm_create:false,vm_wake:false,inference_device:'cpu'}};
+}
 function publicJob(row){return {id:row.id,status:row.status,request:JSON.parse(row.request_json),created:row.created,started:row.started,finished:row.finished,
   error:row.error,metadata:row.metadata?JSON.parse(row.metadata):null,...(row.status==="SUCCEEDED"?{image_url:`/v1/jobs/${row.id}/image`}:{})};}
 
@@ -66,6 +76,11 @@ export class AnimaRelay {
         const heartbeat=this.rows("SELECT value FROM meta WHERE key='agent'")[0];const agent=heartbeat?JSON.parse(heartbeat.value):null;
         return json({relay:"READY",agent_recent:!!agent && now-agent.observed_at<60000,agent});
       }
+      if(path==="/v1/system" && method==="GET"){
+        const entry=this.rows("SELECT value FROM meta WHERE key='agent'")[0];const agent=entry?JSON.parse(entry.value):null;
+        if(!agent?.system)throw new HttpError(503,"No authenticated VM resource snapshot available yet");
+        return json({...agent.system,snapshot_received_at:agent.observed_at,snapshot_age_seconds:agent.system.sampled_at===null?null:Math.max(0,(now/1000)-agent.system.sampled_at),agent_recent:now-agent.observed_at<60000});
+      }
       if(path==="/v1/generations" && method==="POST"){
         const job=validJob(await bodyJSON(request));
         const active=this.rows("SELECT count(*) AS n FROM jobs WHERE status IN ('PENDING','RUNNING')")[0].n;
@@ -86,7 +101,7 @@ export class AnimaRelay {
       }
       if((path==="/agent/claim" || path==="/agent/heartbeat") && method==="POST"){
         const input=await bodyJSON(request,2048);
-        this.sql.exec("INSERT OR REPLACE INTO meta(key,value) VALUES('agent',?)",JSON.stringify({observed_at:now,ready:input.ready===true,busy:input.busy===true,model:"Anima CPU"}));
+        this.sql.exec("INSERT OR REPLACE INTO meta(key,value) VALUES('agent',?)",JSON.stringify({observed_at:now,ready:input.ready===true,busy:input.busy===true,model:"Anima CPU",system:safeMetrics(input.system)}));
         if(path==="/agent/heartbeat")return json({ok:true});
         if(input.ready!==true)return json({job:null});
         if(this.rows("SELECT id FROM jobs WHERE status='RUNNING' LIMIT 1").length)return json({job:null});

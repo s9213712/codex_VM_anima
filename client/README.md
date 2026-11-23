@@ -32,3 +32,40 @@ python anima_client.py --api https://你的已驗證API網址 --key-file client.
 
 VM內127.0.0.1只對VM本身有效，本機填這個位址會連到自己的電腦。
 選HTTP模式仍需完成Cloudflare部署授權；改成本機程式本身不會產生外網入口。
+
+## 自動下載的條件
+
+使用submit --wait會保持客戶端運作、輪詢狀態，完成後檢查PNG與SHA256並存到--output檔案。
+不加--wait只回傳任務ID。關閉客戶端不會取消後端已受理的任務；但本機關機／休眠時不能繼續下載，需之後用status和download取回。
+請保存任務ID；結果能保留多久取決於已配置的收件匣與VM生命週期。
+
+## VM資源概況
+
+```bash
+python anima_client.py --api https://你的已驗證API網址 --key-file client.key resources
+python anima_client.py --api https://你的已驗證API網址 --key-file client.key resources --watch 10 --duration 600
+```
+
+可看CPU配額與使用率、cgroup記憶體用量／上限、磁碟空間、模型狀態／RSS、API運作時間及租期。
+記憶體cgroup用量包含可回收快取；quota_headroom是配額減用量，不等同Linux MemAvailable。
+CPU第一次取樣為null，下一次取得後才有使用率，不假造0%。HTTP中繼回傳VM主動上送的快照，含時間與延遲，並非直接讀取另一台機器。
+這個API需Bearer金鑰，不回傳環境變數、Secret、密碼或雲端帳號額度。watch最多3小時，Ctrl+C可停止。
+
+## 可提交雲端任務，但沒有VM電源API
+
+可選用官方Codex CLI（本機須另安裝並用ChatGPT帳號執行codex login）：
+
+```bash
+python cloud_task.py probe
+python cloud_task.py submit-task --env 已發佈的CodexCloud環境ID --branch 目標工作分支 --task-file task.txt
+python cloud_task.py status TASK_ID
+```
+
+官方CLI有實驗性codex cloud exec命令。本工具先驗證登入模式與實際唯讀雲端存取，再提交一次任務，失敗不重試、不切換付費API key。
+本次VM的login status雖報ChatGPT，實際cloud list卻401；因此**目前未完成派發驗收，也未提交任何新Cloud Task**。
+需在你自己的裝置完成登入，並提供已配置／發佈的CodexCloud環境ID；不能把目前ccarenv開頭的託管電腦ID當成該ID。
+它只派發新Cloud Task與查狀態，不是一般VPS建立／開關機API，不保證喚醒或重用同一台VM，也還沒有自動取得Cloud Task圖片產物的整合。
+Cloud Task會使用你的原生Codex額度，剩餘額度未知；不自動購買額度或啟用付費API。提交回應若逾時，先list/status確認是否已建立，不自動重送。
+Windows的可選派發工具要求官方原生codex.exe；沒有在Windows上實測，不宣稱跨平台完整驗收。
+
+完整「建立環境／啟動 → 送單 → 取圖」一鍵流程尚未完成。送單、下載、資源查詢均需先接上已授權的外部收件方式。

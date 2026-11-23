@@ -40,6 +40,7 @@ class API:
                 return content if binary else json.loads(content)
         except urllib.error.HTTPError as e:raise ClientError('API HTTP '+str(e.code)) from None
     def submit(self,data):return self.request('/v1/generations',data)
+    def resources(self):return self.request('/v1/system')
     def status(self,ident):return self.request('/v1/jobs/'+identifier(ident))
     def download(self,ident):return self.request('/v1/jobs/'+identifier(ident)+'/image',binary=True)
 
@@ -64,11 +65,21 @@ def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--api',required=True);p.add_argument('--key-file',type=Path,required=True);p.add_argument('--local-test',action='store_true')
     sub=p.add_subparsers(dest='command',required=True)
     submit=sub.add_parser('submit');submit.add_argument('--prompt');submit.add_argument('--prompt-file',type=Path);submit.add_argument('--size',type=int,default=256);submit.add_argument('--steps',type=int,default=8);submit.add_argument('--seed',type=int,default=42);submit.add_argument('--wait',action='store_true');submit.add_argument('--output',default='result.png')
+    resources=sub.add_parser('resources');resources.add_argument('--watch',type=int,default=0,help='Refresh seconds, 1..60; omit for one snapshot');resources.add_argument('--duration',type=int,default=10800,help='Maximum watch lifetime, 1..10800 seconds')
     status=sub.add_parser('status');status.add_argument('id')
     download=sub.add_parser('download');download.add_argument('id');download.add_argument('--output',required=True)
     a=p.parse_args()
     try:
         client=API(a.api,a.key_file.read_text().strip(),a.local_test)
+        if a.command=='resources':
+            if not 0<=a.watch<=60:raise ClientError('--watch must be 0..60 seconds')
+            if not 1<=a.duration<=10800:raise ClientError('--duration must be 1..10800 seconds')
+            deadline=time.monotonic()+a.duration
+            while time.monotonic()<deadline:
+                print(json.dumps(client.resources(),ensure_ascii=False,indent=2),flush=True)
+                if not a.watch:return
+                time.sleep(a.watch)
+            return
         if a.command=='status':print(json.dumps(client.status(a.id),ensure_ascii=False,indent=2));return
         if a.command=='download':
             state=client.status(a.id);print(save_image(client.download(a.id),a.output,(state.get('metadata') or {}).get('sha256')));return
@@ -76,5 +87,6 @@ def main():
         job=client.submit(params(prompt,size=a.size,steps=a.steps,seed=a.seed));print(json.dumps(job,ensure_ascii=False))
         if a.wait:
             state=wait(client,job['id']);print(save_image(client.download(job['id']),a.output,(state.get('metadata') or {}).get('sha256')))
+    except KeyboardInterrupt:return
     except (ClientError,OSError) as e:print('ERROR:',str(e),file=sys.stderr);raise SystemExit(2)
 if __name__=='__main__':main()

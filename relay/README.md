@@ -76,3 +76,9 @@ node dev.mjs
 Miniflare/workerd執行真實SQLite Durable Object程式，本機模擬不代表已部署到Cloudflare。
 端到端測試會連接真正Anima模型；它的紀錄需與fixture測試分開閱讀。dev.mjs僅監聽127.0.0.1:8787，15分鐘自動停止。
 所有測試秘密在.state，程式zip排除node_modules、模型、資料庫與秘密。
+
+## 資源快照
+
+Agent主動上送固定白名單系統數值；Consumer可用GET /v1/system（CLIENT_KEY）查CPU、RAM、磁碟與模型狀態。
+含sampled_at、snapshot_received_at、snapshot_age_seconds與agent_recent；舊快照不等於即時資源或VM仍在線。
+不接受任意環境欄位，不提供VM建立／喚醒命令。這些端點已在本機真實量測及Miniflare驗證，公開端點仍待部署授權。

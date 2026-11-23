@@ -51,3 +51,14 @@ def test_relay_idempotency_survives_repeated_delivery(client):
     b=client.post('/v1/generations',headers=headers,json={'prompt':'first'})
     assert a.status_code==202 and b.status_code==202 and a.json()['id']==b.json()['id']
     with store.connect() as c:assert c.execute('SELECT count(*) FROM jobs').fetchone()[0]==1
+
+def test_resource_snapshot_requires_auth_and_returns_real_measurements(client):
+    assert client.get('/v1/system').status_code==401
+    r=client.get('/v1/system',headers=auth());assert r.status_code==200
+    result=r.json()
+    assert result['cpu']['visible_cores']>=1
+    assert result['memory']['limit_bytes']>0
+    assert result['disk']['total_bytes']>0 and result['disk']['free_bytes']>=0
+    assert result['capabilities']['vm_create'] is False
+    assert result['capabilities']['vm_wake'] is False
+    assert 'unit-test-only-' not in r.text

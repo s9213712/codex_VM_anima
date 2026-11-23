@@ -2,16 +2,17 @@
 > test
 > node --test test/*.test.js
 
-✔ rejects missing/incorrect credentials and separates client/agent roles (3339.408217ms)
-✔ rejects arbitrary forwarding fields and invalid generation parameters (3226.347694ms)
-✔ bounds queue, grants one lease, preserves PNG and hides lease from clients (255.256807ms)
-✔ invalid PNG cannot complete a task; failure remains visible (155.32771ms)
-✔ daily application budget stops the 21st generation (801.882491ms)
-ℹ tests 5
+✔ rejects missing/incorrect credentials and separates client/agent roles (3742.440534ms)
+✔ rejects arbitrary forwarding fields and invalid generation parameters (3291.228666ms)
+✔ bounds queue, grants one lease, preserves PNG and hides lease from clients (428.152964ms)
+✔ invalid PNG cannot complete a task; failure remains visible (579.442783ms)
+✔ daily application budget stops the 21st generation (971.158418ms)
+✔ resource view needs client auth, reports timestamp and filters unapproved fields (422.532627ms)
+ℹ tests 6
 ℹ suites 0
-ℹ pass 5
+ℹ pass 6
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 8986.919471
+ℹ duration_ms 10504.238256

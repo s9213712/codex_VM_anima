@@ -50,6 +50,7 @@ async def supervise(child):
 
 @asynccontextmanager
 async def lifespan(app):
+    app.state.started_at=time.time()
     store.init();store.interrupted('Service restarted; resubmit explicitly')
     if os.environ.get('ANIMA_TEST_NO_WORKER')=='1':yield;return
     store.status('model',{'state':'LOADING','device':'cpu','dtype':'bfloat16'})
@@ -90,3 +91,8 @@ def image(ident:uuid.UUID):
     file=OUTPUT/(str(ident)+'.png')
     if not file.is_file():raise HTTPException(410,'Image artifact no longer available')
     return FileResponse(file,media_type='image/png',filename=str(ident)+'.png')
+
+@app.get('/v1/system',dependencies=[Depends(auth)])
+def system_resources():
+    from .metrics import snapshot
+    return snapshot(store.status('model') or {},app.state.started_at)

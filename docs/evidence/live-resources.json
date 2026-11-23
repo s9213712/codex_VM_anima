@@ -1,0 +1,39 @@
+{
+  "sampled_at": 1795433205.2470822,
+  "scope": "VM cgroup where available",
+  "cpu": {
+    "visible_cores": 5,
+    "quota_cores": 4.0,
+    "quota_usage_percent": 0.79,
+    "first_sample_needs_next_poll": false
+  },
+  "memory": {
+    "limit_bytes": 17179869184,
+    "used_bytes": 5464166400,
+    "quota_headroom_bytes": 11715702784
+  },
+  "disk": {
+    "total_bytes": 33770192896,
+    "used_bytes": 7760056320,
+    "free_bytes": 24275374080
+  },
+  "system": {
+    "os": "Linux",
+    "arch": "x86_64",
+    "kernel": "6.18.57"
+  },
+  "capabilities": {
+    "vm_create": false,
+    "vm_wake": false,
+    "inference_device": "cpu"
+  },
+  "model": {
+    "state": "READY",
+    "rss_bytes": 599908352,
+    "observed_at": 1795433200.6300244
+  },
+  "api": {
+    "uptime_seconds": 271,
+    "lease_remaining_seconds": 10528
+  }
+}

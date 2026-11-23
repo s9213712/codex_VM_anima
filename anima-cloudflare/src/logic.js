@@ -11,6 +11,11 @@ function agentGate(ageMs){
   if(ageMs>AGENT_SOFT_MS)return "queue";
   return "ok";
 }
+const FALLBACK_TIMEOUT_MS=300000;
+function fallbackDecision(gate,fallbackConfigured){
+  if(gate!=="reject")return "primary";
+  return fallbackConfigured?"fallback":"reject";
+}
 const ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 class HttpError extends Error { constructor(status,message) {super(message);this.status=status;} }
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:JSON_HEADERS});
@@ -57,10 +62,10 @@ function safeMetrics(value){
     api:{uptime_seconds:number(value.api?.uptime_seconds),lease_remaining_seconds:number(value.api?.lease_remaining_seconds)},
     capabilities:{vm_create:false,vm_wake:false,inference_device:'cpu'}};
 }
-function publicJob(row){return {id:row.id,status:row.status,request:JSON.parse(row.request_json),created:row.created,started:row.started,finished:row.finished,
+function publicJob(row){return {id:row.id,status:row.status,backend:row.backend||"primary",request:JSON.parse(row.request_json),created:row.created,started:row.started,finished:row.finished,
   error:row.error,metadata:row.metadata?JSON.parse(row.metadata):null,...(row.status==="SUCCEEDED"?{image_url:`/v1/jobs/${row.id}/image`}:{})};}
 
 
 
-export { ID, JSON_HEADERS, HttpError, json, authenticate, bytes, bodyJSON, validJob, safeMetrics, publicJob, agentGate,
+export { ID, fallbackDecision, FALLBACK_TIMEOUT_MS, JSON_HEADERS, HttpError, json, authenticate, bytes, bodyJSON, validJob, safeMetrics, publicJob, agentGate,
   AGENT_SOFT_MS, AGENT_HARD_MS, LEASE_MS, PENDING_MAX_MS };

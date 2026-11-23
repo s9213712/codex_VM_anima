@@ -1,5 +1,5 @@
 import UI_HTML from "./ui.generated.js";
-import { ID, HttpError, json, authenticate, bytes, bodyJSON, validJob, safeMetrics, publicJob, agentGate, AGENT_SOFT_MS, AGENT_HARD_MS, LEASE_MS, PENDING_MAX_MS } from "./logic.js";
+import { ID, fallbackDecision, FALLBACK_TIMEOUT_MS, HttpError, json, authenticate, bytes, bodyJSON, validJob, safeMetrics, publicJob, agentGate, AGENT_SOFT_MS, AGENT_HARD_MS, LEASE_MS, PENDING_MAX_MS } from "./logic.js";
 
 export class AnimaRelayV2 {
 
@@ -8,6 +8,7 @@ export class AnimaRelayV2 {
     this.sql.exec("CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY,status TEXT NOT NULL,request_json TEXT NOT NULL,created INTEGER NOT NULL,started INTEGER,finished INTEGER,lease TEXT,lease_until INTEGER,error TEXT,metadata TEXT,image BLOB)");
     this.sql.exec("CREATE INDEX IF NOT EXISTS jobs_pending ON jobs(status,created)");
     this.sql.exec("CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY,value TEXT NOT NULL)");
+    try{this.sql.exec("ALTER TABLE jobs ADD COLUMN backend TEXT");}catch(e){}
   }
   rows(query,...args){return this.sql.exec(query,...args).toArray();}
   async fetch(request){
@@ -26,7 +27,7 @@ export class AnimaRelayV2 {
         const lastError=this.rows("SELECT error FROM jobs WHERE status='FAILED' AND error IS NOT NULL ORDER BY finished DESC LIMIT 1")[0]?.error ?? null;
         return json({relay:"READY",agent_recent:!!agent && now-agent.observed_at<60000,agent_age_seconds:age,
           pending,running,last_error:lastError,
-          policy:{soft_queue_seconds:AGENT_SOFT_MS/1000,hard_reject_seconds:AGENT_HARD_MS/1000,lease_seconds:LEASE_MS/1000,pending_max_seconds:PENDING_MAX_MS/1000},
+          fallback_configured:!!this.env.FALLBACK_URL,policy:{soft_queue_seconds:AGENT_SOFT_MS/1000,hard_reject_seconds:AGENT_HARD_MS/1000,lease_seconds:LEASE_MS/1000,pending_max_seconds:PENDING_MAX_MS/1000},
           agent});
       }
       if(path==="/v1/system" && method==="GET"){
@@ -38,13 +39,20 @@ export class AnimaRelayV2 {
         const job=validJob(await bodyJSON(request));
         const hb=this.rows("SELECT value FROM meta WHERE key='agent'")[0];const hbAgent=hb?JSON.parse(hb.value):null;
         const gate=agentGate(hbAgent?now-hbAgent.observed_at:null);
-        if(gate==="reject")throw new HttpError(503,"Agent offline; no fallback backend configured");
+        const route=fallbackDecision(gate,!!this.env.FALLBACK_URL);
+        if(route==="reject")throw new HttpError(503,"Agent offline and no fallback backend configured");
         const active=this.rows("SELECT count(*) AS n FROM jobs WHERE status IN ('PENDING','RUNNING')")[0].n;
         if(active>=2)throw new HttpError(429,"Queue full; retry after an existing task completes");
         const day=now-now%86400000;
         if(this.rows("SELECT count(*) AS n FROM jobs WHERE created>=?",day)[0].n>=20)throw new HttpError(429,"Daily application limit reached (20 jobs UTC)");
-        const id=crypto.randomUUID();this.sql.exec("INSERT INTO jobs(id,status,request_json,created) VALUES(?,'PENDING',?,?)",id,JSON.stringify(job),now);
-        return json({id,status:"PENDING",status_url:`/v1/jobs/${id}`,queued_while_agent_offline:gate==="queue"},202);
+        const id=crypto.randomUUID();
+        if(route==="fallback"){
+          this.sql.exec("INSERT INTO jobs(id,status,request_json,created,started,backend) VALUES(?,'RUNNING',?,?,?,'fallback')",id,JSON.stringify(job),now,now);
+          this.ctx.waitUntil(this.runFallback(id,job));
+          return json({id,status:"RUNNING",backend:"fallback",status_url:`/v1/jobs/${id}`},202);
+        }
+        this.sql.exec("INSERT INTO jobs(id,status,request_json,created,backend) VALUES(?,'PENDING',?,?,'primary')",id,JSON.stringify(job),now);
+        return json({id,status:"PENDING",backend:"primary",status_url:`/v1/jobs/${id}`,queued_while_agent_offline:gate==="queue"},202);
       }
       let match=path.match(new RegExp(`^/v1/jobs/(${ID})(/image)?$`));
       if(match && method==="GET"){
@@ -61,7 +69,7 @@ export class AnimaRelayV2 {
         if(path==="/agent/heartbeat")return json({ok:true});
         if(input.ready!==true)return json({job:null});
         if(this.rows("SELECT id FROM jobs WHERE status='RUNNING' LIMIT 1").length)return json({job:null});
-        const row=this.rows("SELECT * FROM jobs WHERE status='PENDING' ORDER BY created,id LIMIT 1")[0];if(!row)return json({job:null});
+        const row=this.rows("SELECT * FROM jobs WHERE status='PENDING' AND (backend IS NULL OR backend='primary') ORDER BY created,id LIMIT 1")[0];if(!row)return json({job:null});
         const lease=crypto.randomUUID();this.sql.exec("UPDATE jobs SET status='RUNNING',started=?,lease=?,lease_until=? WHERE id=?",now,lease,now+LEASE_MS,row.id);
         return json({job:{id:row.id,request:JSON.parse(row.request_json),lease,lease_until:now+LEASE_MS}});
       }
@@ -103,6 +111,25 @@ export class AnimaRelayV2 {
       throw new HttpError(404,"Unknown application endpoint");
     }catch(e){return json({error:e instanceof HttpError?e.message:"Relay storage operation failed"},e instanceof HttpError?e.status:503);}
   }
+
+  async runFallback(id,job){
+    const base=this.env.FALLBACK_URL;
+    try{
+      if(!base)throw new Error("Fallback not configured");
+      const headers={"Content-Type":"application/json"};
+      if(this.env.FALLBACK_KEY)headers["Authorization"]="Bearer "+this.env.FALLBACK_KEY;
+      const res=await fetch(base.replace(/\/+$/,"")+"/generate",{method:"POST",headers,body:JSON.stringify(job),signal:AbortSignal.timeout(FALLBACK_TIMEOUT_MS)});
+      if(!res.ok)throw new Error("Fallback HTTP "+res.status);
+      const buf=new Uint8Array(await res.arrayBuffer());
+      if(buf.length<8 || [137,80,78,71,13,10,26,10].some((x,i)=>buf[i]!==x))throw new Error("Fallback did not return a PNG");
+      const digest=await crypto.subtle.digest("SHA-256",buf);
+      const sha=Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,"0")).join("");
+      const metadata={engine:"fallback",endpoint:base,sha256:sha,finished_at:Date.now()};
+      this.sql.exec("UPDATE jobs SET status='SUCCEEDED',finished=?,metadata=?,image=? WHERE id=?",Date.now(),JSON.stringify(metadata),buf.buffer,id);
+    }catch(e){
+      this.sql.exec("UPDATE jobs SET status='FAILED',finished=?,error=? WHERE id=?",Date.now(),String(e.message||e).slice(0,2000),id);
+    }
+  }
 }
 
 export default {
@@ -115,7 +142,8 @@ export default {
         return json({build:"v2-liveness",service:"Anima HTTPS image-job relay",authentication:"Bearer required",ui:"/ui",docs:"POST /v1/generations, then poll returned status_url"});
       }
       await authenticate(request,path.startsWith("/agent/")?env.AGENT_KEY:env.CLIENT_KEY);
-      return await env.RELAY.get(env.RELAY.idFromName(env.RELAY_INSTANCE || "single-approved-image-worker-v2")).fetch(request);
+      return await env.RELAY.get(env.RELAY.idFromName(env.RELAY_INSTANCE || "single-approved-image-worker-v3")).fetch(request);
     }catch(e){return json({error:e instanceof HttpError?e.message:"Relay temporarily unavailable"},e instanceof HttpError?e.status:503);}
+
   }
 };

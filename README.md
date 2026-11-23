@@ -194,6 +194,46 @@ curl -s -X POST "$RELAY/v1/generations" \
 
 ---
 
+## 6.5 Fallback（VM 離線時改用其他後端）
+
+當 VM 代理心跳超過 **5 分鐘**沒更新，relay 會把新任務轉給 fallback 後端；VM 在線時永遠優先走 VM。
+
+### 啟用
+
+```bash
+npx wrangler secret put FALLBACK_URL    # 例：https://anima-bridge.example.com
+npx wrangler secret put FALLBACK_KEY    # 與 bridge 的 BRIDGE_TOKEN 相同
+```
+
+> 注意：Worker/Durable Object 的行為變更要 bump `src/worker.js` 裡的 `RELAY_INSTANCE` 版本號再部署，
+> 否則既有 DO 實例仍跑舊程式碼。
+
+### Fallback 契約（任何後端只要實作這個就能接）
+
+```
+POST {FALLBACK_URL}/generate
+Authorization: Bearer {FALLBACK_KEY}
+{"prompt","negative_prompt","width","height","steps","seed"}
+→ 200 image/png（≤2 MB）
+GET {FALLBACK_URL}/healthz → {"ok":true}
+```
+
+### 三種後端
+
+| 後端 | 做法 |
+|---|---|
+| **本地 ComfyUI** | 在跑 ComfyUI 的機器上執行 `python3 bridge/comfy_bridge.py --port 8899 --workflow workflow.json`，再用 `cloudflared tunnel --url http://127.0.0.1:8899` 取得 HTTPS 網址 |
+| **Colab** | 同一個 bridge 腳本貼進 notebook，配合 cloudflared/ngrok；記得 Colab 會逾時斷線 |
+| **ComfyUI Cloud / 其他 API** | 寫一個小轉接器（把對方 API 包成上面的 `/generate` 契約），或用 `--backend command` 的 agent 當轉接 |
+
+### 行為
+
+- 只有在 `agent_age > 300s` 時才會走 fallback；90–300 秒仍是排隊等 VM
+- fallback 任務在 UI 上會標「備援」，`/v1/jobs/{id}` 的 `backend` 欄位為 `fallback`
+- fallback 失敗會直接把任務標 FAILED，不會無限重試
+
+---
+
 ## 7. 疑難排解
 
 | 症狀 | 原因與處理 |

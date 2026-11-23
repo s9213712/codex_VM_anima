@@ -169,6 +169,7 @@ async function refresh(){
     const m = h.agent?.system?.model;
     $("s-model").textContent = m ? `${m.state}${m.lora_name?" · "+m.lora_name:""}` : "—";
     $("s-queue").textContent = `待處理 ${h.pending ?? 0} / 執行中 ${h.running ?? 0}`;
+    $("s-policy").dataset.fallback = h.fallback_configured ? "1" : "0";
     const cpu = h.agent?.system?.cpu, mem = h.agent?.system?.memory;
     $("s-res").textContent = cpu ? `${cpu.quota_usage_percent ?? "?"}% · ${(mem.used_bytes/1e9).toFixed(1)}/${(mem.limit_bytes/1e9).toFixed(0)} GB` : "—";
     $("s-err").textContent = h.last_error || "—";
@@ -191,7 +192,7 @@ function renderJob(j){
   el.className = "job";
   el.innerHTML = `
     <div class="top">
-      <div><span class="chip ${j.status}">${({PENDING:"排隊中",RUNNING:"執行中",SUCCEEDED:"完成",FAILED:"失敗"})[j.status]||j.status}</span>
+      <div><span class="chip ${j.status}">${({PENDING:"排隊中",RUNNING:"執行中",SUCCEEDED:"完成",FAILED:"失敗"})[j.status]||j.status}</span>${j.backend==="fallback"?'<span class="chip">備援</span>':""}
       <span class="meta">${p.width}×${p.height} · ${p.steps} 步 · seed ${p.seed}</span></div>
       <span class="meta">${fmt(j.created)}</span>
     </div>

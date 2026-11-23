@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { authenticate, bytes, validJob, safeMetrics, publicJob, agentGate, AGENT_SOFT_MS, AGENT_HARD_MS, LEASE_MS, PENDING_MAX_MS } from "../src/logic.js";
+import { authenticate, bytes, validJob, safeMetrics, publicJob, agentGate, fallbackDecision, AGENT_SOFT_MS, AGENT_HARD_MS, LEASE_MS, PENDING_MAX_MS } from "../src/logic.js";
 
 const GOOD = { prompt: "a cat", negative_prompt: "blurry", width: 512, height: 512, steps: 8, seed: 42 };
 const KEY = "k".repeat(44);
@@ -108,4 +108,17 @@ test("queue policy constants match the documented values", () => {
   assert.equal(PENDING_MAX_MS, 10 * 60 * 1000);
   assert.equal(AGENT_SOFT_MS, 90 * 1000);
   assert.equal(AGENT_HARD_MS, 300 * 1000);
+});
+
+test("fallbackDecision picks the fallback only when the agent is hard-offline", () => {
+  assert.equal(fallbackDecision("ok", true), "primary");
+  assert.equal(fallbackDecision("queue", true), "primary");
+  assert.equal(fallbackDecision("reject", true), "fallback");
+  assert.equal(fallbackDecision("reject", false), "reject");
+});
+
+test("publicJob exposes the backend that handled the job", () => {
+  const base = { id: "a", status: "SUCCEEDED", request_json: JSON.stringify(GOOD), created: 1, started: 2, finished: 3, error: null, metadata: null };
+  assert.equal(publicJob(base).backend, "primary");
+  assert.equal(publicJob({ ...base, backend: "fallback" }).backend, "fallback");
 });

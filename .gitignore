@@ -1,0 +1,10 @@
+# secrets — never commit
+anima-cloudflare/.private/
+**/*.key
+anima-cloudflare/vm-pairing/vm-pairing.encrypted.json
+**/.wrangler/
+**/node_modules/
+**/__pycache__/
+**/.update-backups/
+**/.dry-run/
+*.log

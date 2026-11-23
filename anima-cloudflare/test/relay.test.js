@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import worker, { authenticate, bytes, validJob, safeMetrics, publicJob, AnimaRelay } from "../src/worker.js";
+import worker, { authenticate, bytes, validJob, safeMetrics, publicJob, AnimaRelay, agentGate, AGENT_SOFT_MS, AGENT_HARD_MS, LEASE_MS, PENDING_MAX_MS } from "../src/worker.js";
 
 const GOOD = { prompt: "a cat", negative_prompt: "blurry", width: 512, height: 512, steps: 8, seed: 42 };
 const KEY = "k".repeat(44);
@@ -90,4 +90,22 @@ test("bytes enforces the declared and streamed limits", async () => {
 
   const streamed = new Request("https://x/", { method: "POST", body: "abcdefgh" });
   await assert.rejects(bytes(streamed, 4), (e) => e.status === 413);
+});
+
+test("agentGate implements queue/reject thresholds", () => {
+  assert.equal(agentGate(0), "ok");
+  assert.equal(agentGate(AGENT_SOFT_MS - 1), "ok");
+  assert.equal(agentGate(AGENT_SOFT_MS + 1), "queue");
+  assert.equal(agentGate(AGENT_HARD_MS - 1), "queue");
+  assert.equal(agentGate(AGENT_HARD_MS + 1), "reject");
+  assert.equal(agentGate(null), "reject");
+  assert.equal(agentGate(undefined), "reject");
+  assert.equal(agentGate(Number.NaN), "reject");
+});
+
+test("queue policy constants match the documented values", () => {
+  assert.equal(LEASE_MS, 15 * 60 * 1000);
+  assert.equal(PENDING_MAX_MS, 10 * 60 * 1000);
+  assert.equal(AGENT_SOFT_MS, 90 * 1000);
+  assert.equal(AGENT_HARD_MS, 300 * 1000);
 });

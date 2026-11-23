@@ -1,4 +1,15 @@
 const JSON_HEADERS = {"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"};
+// 代理存活與任務逾時策略（毫秒）
+const AGENT_SOFT_MS=90000;      // 超過 90 秒沒心跳：仍收單，但標記等待代理
+const AGENT_HARD_MS=300000;     // 超過 5 分鐘：直接拒絕新單
+const LEASE_MS=900000;          // 15 分鐘租約（原本 35 分鐘）
+const PENDING_MAX_MS=600000;    // 卡在 PENDING 超過 10 分鐘 → FAILED
+function agentGate(ageMs){
+  if(ageMs===null||ageMs===undefined||!Number.isFinite(ageMs))return "reject";
+  if(ageMs>AGENT_HARD_MS)return "reject";
+  if(ageMs>AGENT_SOFT_MS)return "queue";
+  return "ok";
+}
 const ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 class HttpError extends Error { constructor(status,message) {super(message);this.status=status;} }
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:JSON_HEADERS});
@@ -59,7 +70,7 @@ export default {
   }
 };
 
-export { authenticate, bytes, bodyJSON, validJob, safeMetrics, publicJob, HttpError, json };
+export { authenticate, bytes, bodyJSON, validJob, safeMetrics, publicJob, agentGate, HttpError, json, AGENT_SOFT_MS, AGENT_HARD_MS, LEASE_MS, PENDING_MAX_MS };
 
 export class AnimaRelay {
 
@@ -74,11 +85,20 @@ export class AnimaRelay {
     try{
       const now=Date.now(),path=new URL(request.url).pathname,method=request.method;
       this.sql.exec("DELETE FROM jobs WHERE created < ?",now-86400000);
+      // 代理離線時卡住的任務：PENDING 超時即失敗，避免客戶端無限輪詢與配額浪費
+      this.sql.exec("UPDATE jobs SET status='FAILED',finished=?,error='Agent offline before claim' WHERE status='PENDING' AND created < ?",now,now-PENDING_MAX_MS);
       this.sql.exec("DELETE FROM meta WHERE key LIKE 'progress:%' AND substr(key,10) NOT IN (SELECT id FROM jobs)");
       this.sql.exec("UPDATE jobs SET status='FAILED',finished=?,error='Worker lease expired; resubmit explicitly' WHERE status='RUNNING' AND lease_until < ?",now,now);
       if(path==="/healthz" && method==="GET"){
         const heartbeat=this.rows("SELECT value FROM meta WHERE key='agent'")[0];const agent=heartbeat?JSON.parse(heartbeat.value):null;
-        return json({relay:"READY",agent_recent:!!agent && now-agent.observed_at<60000,agent});
+        const age=agent?Math.max(0,Math.round((now-agent.observed_at)/1000)):null;
+        const pending=this.rows("SELECT count(*) AS n FROM jobs WHERE status='PENDING'")[0].n;
+        const running=this.rows("SELECT count(*) AS n FROM jobs WHERE status='RUNNING'")[0].n;
+        const lastError=this.rows("SELECT error FROM jobs WHERE status='FAILED' AND error IS NOT NULL ORDER BY finished DESC LIMIT 1")[0]?.error ?? null;
+        return json({relay:"READY",agent_recent:!!agent && now-agent.observed_at<60000,agent_age_seconds:age,
+          pending,running,last_error:lastError,
+          policy:{soft_queue_seconds:AGENT_SOFT_MS/1000,hard_reject_seconds:AGENT_HARD_MS/1000,lease_seconds:LEASE_MS/1000,pending_max_seconds:PENDING_MAX_MS/1000},
+          agent});
       }
       if(path==="/v1/system" && method==="GET"){
         const entry=this.rows("SELECT value FROM meta WHERE key='agent'")[0];const agent=entry?JSON.parse(entry.value):null;
@@ -87,12 +107,15 @@ export class AnimaRelay {
       }
       if(path==="/v1/generations" && method==="POST"){
         const job=validJob(await bodyJSON(request));
+        const hb=this.rows("SELECT value FROM meta WHERE key='agent'")[0];const hbAgent=hb?JSON.parse(hb.value):null;
+        const gate=agentGate(hbAgent?now-hbAgent.observed_at:null);
+        if(gate==="reject")throw new HttpError(503,"Agent offline; no fallback backend configured");
         const active=this.rows("SELECT count(*) AS n FROM jobs WHERE status IN ('PENDING','RUNNING')")[0].n;
         if(active>=2)throw new HttpError(429,"Queue full; retry after an existing task completes");
         const day=now-now%86400000;
         if(this.rows("SELECT count(*) AS n FROM jobs WHERE created>=?",day)[0].n>=20)throw new HttpError(429,"Daily application limit reached (20 jobs UTC)");
         const id=crypto.randomUUID();this.sql.exec("INSERT INTO jobs(id,status,request_json,created) VALUES(?,'PENDING',?,?)",id,JSON.stringify(job),now);
-        return json({id,status:"PENDING",status_url:`/v1/jobs/${id}`},202);
+        return json({id,status:"PENDING",status_url:`/v1/jobs/${id}`,queued_while_agent_offline:gate==="queue"},202);
       }
       let match=path.match(new RegExp(`^/v1/jobs/(${ID})(/image)?$`));
       if(match && method==="GET"){
@@ -110,8 +133,8 @@ export class AnimaRelay {
         if(input.ready!==true)return json({job:null});
         if(this.rows("SELECT id FROM jobs WHERE status='RUNNING' LIMIT 1").length)return json({job:null});
         const row=this.rows("SELECT * FROM jobs WHERE status='PENDING' ORDER BY created,id LIMIT 1")[0];if(!row)return json({job:null});
-        const lease=crypto.randomUUID();this.sql.exec("UPDATE jobs SET status='RUNNING',started=?,lease=?,lease_until=? WHERE id=?",now,lease,now+2100000,row.id);
-        return json({job:{id:row.id,request:JSON.parse(row.request_json),lease,lease_until:now+2100000}});
+        const lease=crypto.randomUUID();this.sql.exec("UPDATE jobs SET status='RUNNING',started=?,lease=?,lease_until=? WHERE id=?",now,lease,now+LEASE_MS,row.id);
+        return json({job:{id:row.id,request:JSON.parse(row.request_json),lease,lease_until:now+LEASE_MS}});
       }
       match=path.match(new RegExp(`^/agent/jobs/(${ID})/progress$`));
       if(match && method==='POST'){

@@ -105,7 +105,7 @@
       <datalist id="modelList"></datalist>
       <label>LoRA</label>
       <select id="f-lora" style="margin-bottom:6px"></select>
-      <label style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><input type="checkbox" id="f-turbo"> Turbo LoRA（快，8 步；取消則標準 30 步）</label>
+      <label style="display:flex;align-items:center;gap:6px;margin-bottom:6px" id="turbo-row"><input type="checkbox" id="f-turbo"> Turbo LoRA（快，8 步；取消則標準 30 步）<span id="turbo-note" style="color:#8a93b8;font-size:12px"></span></label>
       <label>負面提示詞</label>
         <input id="neg" type="text" value="low quality, blurry">
         <div class="row">
@@ -223,7 +223,16 @@ async function refresh(){
       if(!fm.value || ![...fm.options].some(o=>o.value===fm.value)) fm.value = models[0] || CURATED[0];
       fmc.style.display = fm.value === "__custom__" ? "" : "none";
     }
-    fm.onchange = () => { fmc.style.display = fm.value === "__custom__" ? "" : "none"; };
+    fm.onchange = () => { fmc.style.display = fm.value === "__custom__" ? "" : "none"; syncTurbo(); };
+    const isAnimaModel = () => /anima|janima/i.test(fm.value === "__custom__" ? fmc.value : fm.value);
+    function syncTurbo(){
+      const ft = $("f-turbo"), ok = isAnimaModel();
+      ft.disabled = !ok;
+      $("turbo-note").textContent = ok ? "" : "（僅 Anima 系模型可用）";
+      if(!ok) ft.checked = false;
+    }
+    fmc.addEventListener("input", syncTurbo);
+    syncTurbo();
     if(fl.options.length !== loras.length + 1){
       fl.innerHTML = '<option value="">不用 LoRA</option>' + loras.map(l=>`<option>${l}</option>`).join("");
     }

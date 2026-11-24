@@ -100,7 +100,8 @@
         <select id="recent" style="margin-bottom:6px"><option value="">最近用過的提示詞…</option></select>
         <textarea id="prompt" placeholder="描述你想要的畫面…"></textarea>
         <label>模型（可輸入任意 HF repo id，後端自動下載）</label>
-      <input id="f-model" list="modelList" style="margin-bottom:6px;background:var(--card2);color:var(--tx);border:1px solid #33406e;border-radius:8px;padding:6px;width:100%" placeholder="JANKU v777 或輸入 HF repo id">
+      <select id="f-model" style="margin-bottom:6px;background:var(--card2);color:var(--tx);border:1px solid #33406e;border-radius:8px;padding:6px;width:100%"></select>
+      <input id="f-model-custom" style="display:none;margin-bottom:6px;background:var(--card2);color:var(--tx);border:1px solid #33406e;border-radius:8px;padding:6px;width:100%" placeholder="輸入 HF repo id 或模型檔名">
       <datalist id="modelList"></datalist>
       <label>LoRA</label>
       <select id="f-lora" style="margin-bottom:6px"></select>
@@ -115,7 +116,7 @@
               <option value="768">768 × 768（1:1）</option>
               <option value="1024">1024 × 1024（1:1）</option>
               <option value="1024x576">1024 × 576（16:9）</option>
-              <option value="768x432">768 × 432（16:9）</option>
+              <option value="768x448">768 × 448（16:9）</option>
               <option value="custom">自訂</option>
             </select>
           </div>
@@ -215,11 +216,14 @@ async function refresh(){
                      "circlestone-labs/Anima-Base-v1.0-Diffusers",
                      "stabilityai/stable-diffusion-xl-base-1.0"];
     const all = [...new Set([...models, ...CURATED])];
-    const fm = $("f-model"), fl = $("f-lora"), dl = $("modelList");
-    if(dl.options.length !== all.length){
-      dl.innerHTML = all.map(m=>`<option value="${m}">${m.includes("/")?"HF:"+m:m}</option>`).join("");
-      if(!fm.value) fm.value = models[0] || CURATED[0];
+    const fm = $("f-model"), fmc = $("f-model-custom"), fl = $("f-lora"), dl = $("modelList");
+    if(fm.options.length !== all.length + 1){
+      fm.innerHTML = all.map(m=>`<option value="${m}">${m.includes("/")?"HF: "+m:m}${models.includes(m)?" ✓":""}</option>`).join("") + '<option value="__custom__">自訂（輸入 HF repo id…）</option>';
+      dl.innerHTML = all.map(m=>`<option value="${m}"></option>`).join("");
+      if(!fm.value || ![...fm.options].some(o=>o.value===fm.value)) fm.value = models[0] || CURATED[0];
+      fmc.style.display = fm.value === "__custom__" ? "" : "none";
     }
+    fm.onchange = () => { fmc.style.display = fm.value === "__custom__" ? "" : "none"; };
     if(fl.options.length !== loras.length + 1){
       fl.innerHTML = '<option value="">不用 LoRA</option>' + loras.map(l=>`<option>${l}</option>`).join("");
     }
@@ -348,7 +352,8 @@ async function submit(){
   let queued = 0, offline = false;
   try{
     for(let i=0;i<batch;i++){
-      const body = { prompt, negative_prompt: $("neg").value, width, height, steps, seed: baseSeed + i , model: $("f-model").value, lora: $("f-lora").value, turbo: $("f-turbo").checked};
+      const model = $("f-model").value === "__custom__" ? ($("f-model-custom").value || "").trim() : $("f-model").value;
+      const body = { prompt, negative_prompt: $("neg").value, width, height, steps, seed: baseSeed + i , model, lora: $("f-lora").value, turbo: $("f-turbo").checked};
       const r = await api("/v1/generations", { method:"POST", body: JSON.stringify(body) });
       const j = await r.json();
       jobs.unshift(j.id); localStorage.setItem(LS.jobs, JSON.stringify(jobs));

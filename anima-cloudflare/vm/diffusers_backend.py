@@ -78,12 +78,14 @@ def guess_family(source: str) -> str:
     return "generic"
 
 
-def load_pipe(model: str):
+def load_pipe(model: str, family_override: str = ""):
     import torch
     from diffusers import DiffusionPipeline, StableDiffusionXLPipeline
     src, family = resolve_source(model, "checkpoint")
     if family == "auto":
         family = guess_family(src)
+    if family_override:
+        family = family_override
     log(f"載入 {src}（family={family}）")
     dtype = torch.float16 if torch.cuda.is_available() else torch.float32
     if family == "sdxl-single":
@@ -113,7 +115,7 @@ def load_pipe(model: str):
 def render(job: dict) -> bytes:
     import torch
     model = (job.get("model") or DEFAULT_MODEL).strip()
-    pipe = load_pipe(model)
+    pipe = load_pipe(model, (job.get("base_family") or "").strip())
     turbo = bool(job.get("turbo"))
     lora = (job.get("lora") or "").strip() or (TURBO_LORA if turbo else "")
     if lora:
@@ -195,10 +197,47 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             return None
 
+    def _cpu(self):
+        try:
+            import ctypes, time
+            if not hasattr(self.server, "_cpu_last"):
+                class KT(ctypes.Structure):
+                    _fields_ = [("idle", ctypes.c_ulonglong), ("kernel", ctypes.c_ulonglong), ("user", ctypes.c_ulonglong)]
+                idle, kernel, user = KT(), KT(), KT()
+                ctypes.windll.kernel32.GetSystemTimes(ctypes.byref(idle), ctypes.byref(kernel), ctypes.byref(user))
+                self.server._cpu_last = (time.time(), idle.idle + kernel.idle, kernel.kernel + kernel.user + user.user + user.idle)
+            t0, i0, b0 = self.server._cpu_last
+            time.sleep(0.15)
+            idle, kernel, user = KT(), KT(), KT()
+            ctypes.windll.kernel32.GetSystemTimes(ctypes.byref(idle), ctypes.byref(kernel), ctypes.byref(user))
+            i1, b1 = idle.idle + kernel.idle, kernel.kernel + kernel.user + user.user + user.idle
+            self.server._cpu_last = (time.time(), i1, b1)
+            dt, di, db = b1 - b0, i1 - i0, b1 - b0
+            return round(100.0 * (1.0 - di / dt), 1) if dt > 0 else None
+        except Exception:
+            return None
+
+    def _hist(self, cpu, memp):
+        try:
+            import time as _t
+            if not hasattr(self.server, "_hist"):
+                self.server._hist = []
+            h = self.server._hist
+            if cpu is not None or memp is not None:
+                h.append({"t": int(_t.time()), "cpu": cpu, "mem": memp})
+                del h[:-60]
+            return h
+        except Exception:
+            return []
+
     def do_GET(self):
         if self.path == "/healthz":
+            cpu = self._cpu()
+            mem = self._mem()
             return self._json(200, {"ok": True, "engine": "diffusers-universal",
-                                    "system": {"memory": self._mem()}})
+                                    "system": {"memory": mem,
+                                               "cpu": {"usage_percent": cpu},
+                                               "history": self._hist(cpu, mem["percent"] if mem else None)}})
         if self.path == "/models":
             return self._json(200, {
                 "checkpoints": sorted(set(local_models("checkpoint")) | set(registry().keys())),

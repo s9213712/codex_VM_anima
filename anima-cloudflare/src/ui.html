@@ -90,6 +90,7 @@
         <div class="stat"><span>模型</span><span id="s-model">—</span></div>
         <div class="stat"><span>佇列</span><span id="s-queue">—</span></div>
         <div class="stat"><span>CPU / 記憶體</span><span id="s-res">—</span></div>
+        <canvas id="res-chart" width="300" height="56" style="width:100%;height:56px;margin-top:4px"></canvas>
         <div class="stat"><span>最近錯誤</span><span id="s-err" class="err">—</span></div>
         <div class="hint" id="s-policy"></div>
       </section>
@@ -102,6 +103,14 @@
         <label>模型（可輸入任意 HF repo id，後端自動下載）</label>
       <select id="f-model" style="margin-bottom:6px;background:var(--card2);color:var(--tx);border:1px solid #33406e;border-radius:8px;padding:6px;width:100%"></select>
       <input id="f-model-custom" style="display:none;margin-bottom:6px;background:var(--card2);color:var(--tx);border:1px solid #33406e;border-radius:8px;padding:6px;width:100%" placeholder="輸入 HF repo id 或模型檔名">
+      <label id="base-row" style="display:none;margin-bottom:6px">底模（自訂模型用）
+        <select id="f-base" style="background:var(--card2);color:var(--tx);border:1px solid #33406e;border-radius:8px;padding:6px;width:100%">
+          <option value="">自動判斷</option>
+          <option value="sdxl-single">SDXL 單檔（safetensors/ckpt 微調）</option>
+          <option value="generic">diffusers 標準管線</option>
+          <option value="anima">Anima 系（modular + remote code）</option>
+        </select>
+      </label>
       <datalist id="modelList"></datalist>
       <label>LoRA</label>
       <select id="f-lora" style="margin-bottom:6px"></select>
@@ -201,8 +210,12 @@ async function refresh(){
     $("s-model").textContent = m ? `${m.state}${m.lora_name?" · "+m.lora_name:""}` : "—";
     $("s-queue").textContent = `待處理 ${h.pending ?? 0} / 執行中 ${h.running ?? 0}`;
     $("s-policy").dataset.fallback = h.fallback_configured ? "1" : "0";
-    const cpu = h.agent?.system?.cpu, mem = h.agent?.system?.memory;
-    $("s-res").textContent = cpu ? `${cpu.quota_usage_percent ?? "?"}% · ${(mem.used_bytes/1e9).toFixed(1)}/${(mem.limit_bytes/1e9).toFixed(0)} GB` : "—";
+    const sysv = h.agent?.system || h.system || h.backend?.system || null;
+    const cpu = sysv?.cpu?.usage_percent ?? sysv?.cpu?.quota_usage_percent ?? null;
+    const memU = Number(sysv?.memory?.used ?? (sysv?.memory?.used_bytes ? sysv.memory.used_bytes/1e9 : NaN));
+    const memT = Number(sysv?.memory?.total ?? (sysv?.memory?.limit_bytes ? sysv.memory.limit_bytes/1e9 : NaN));
+    $("s-res").textContent = (cpu != null || !isNaN(memT)) ? `${cpu ?? "?"}% · ${isNaN(memU)?"?":memU.toFixed(1)}/${isNaN(memT)?"?":memT.toFixed(0)}GB` : "—";
+    drawResChart(sysv?.history || []);
     $("s-err").textContent = h.last_error || "—";
     const be = h.backend || {};
     if(be.online !== undefined && !online){
@@ -228,7 +241,7 @@ async function refresh(){
       if(!fm.value || ![...fm.options].some(o=>o.value===fm.value)) fm.value = models[0] || CURATED[0];
       fmc.style.display = fm.value === "__custom__" ? "" : "none";
     }
-    fm.onchange = () => { fmc.style.display = fm.value === "__custom__" ? "" : "none"; syncTurbo(); };
+    fm.onchange = () => { fmc.style.display = fm.value === "__custom__" ? "" : "none"; $("base-row").style.display = fmc.style.display; syncTurbo(); };
     const isAnimaModel = () => /anima|janima/i.test(fm.value === "__custom__" ? fmc.value : fm.value);
     function syncTurbo(){
       const ft = $("f-turbo"), ok = isAnimaModel();
@@ -250,6 +263,20 @@ async function refresh(){
 }
 
 function fmt(ts){ return ts ? new Date(ts).toLocaleTimeString() : "—"; }
+
+function drawResChart(hist){
+  const c = document.getElementById("res-chart");
+  if(!c || !hist || hist.length < 2) return;
+  const ctx = c.getContext("2d");
+  ctx.clearRect(0, 0, c.width, c.height);
+  const series = [["cpu", "#7aa2ff"], ["mem", "#67d38b"]];
+  for(const [key, color] of series){
+    const pts = hist.map((p, i) => [i / (hist.length - 1) * c.width, c.height - (p[key] ?? 0) / 100 * c.height]);
+    ctx.beginPath();
+    pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+    ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+}
 
 function renderJob(j){
   const p = j.request || {};
@@ -367,7 +394,8 @@ async function submit(){
   try{
     for(let i=0;i<batch;i++){
       const model = $("f-model").value === "__custom__" ? ($("f-model-custom").value || "").trim() : $("f-model").value;
-      const body = { prompt, negative_prompt: $("neg").value, width, height, steps, seed: baseSeed + i , model, lora: $("f-lora").value, turbo: $("f-turbo").checked};
+      const baseFamily = model && $("f-model").value === "__custom__" ? ($("f-base") ? $("f-base").value : "") : "";
+      const body = { prompt, negative_prompt: $("neg").value, width, height, steps, seed: baseSeed + i , model, base_family: baseFamily, lora: $("f-lora").value, turbo: $("f-turbo").checked};
       const r = await api("/v1/generations", { method:"POST", body: JSON.stringify(body) });
       const j = await r.json();
       jobs.unshift(j.id); localStorage.setItem(LS.jobs, JSON.stringify(jobs));

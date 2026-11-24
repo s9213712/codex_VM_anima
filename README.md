@@ -337,5 +337,6 @@ Private project. 權重與模型授權依各自來源（Anima / SDXL 等）為�
 | `docs/GEMINI-VM.md` | 用 Gemini（Jules／Gemini CLI）生 GPU VM 並接上本專案 |
 | `docs/CLAUDE-VM.md` | 用 Claude（CLI／Remote Control／cloud）建置或接管 VM |
 | `docs/CODEX-TASKS.md` | 可直接貼給 Codex 的 VM 端待辦提示詞 |
+| `docs/CODEX-REBUILD-PROMPT.md` | 開全新 Codex session 時，重建環境的完整提示詞 |
 | `deploy/rebuild/` | VM 重建包（collect.sh / bootstrap.sh / workflow 模板） |
 | `AGENTS.md` | 給雲端 coding agent 的專案規則與禁區 |

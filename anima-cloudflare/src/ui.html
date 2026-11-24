@@ -213,7 +213,6 @@ async function refresh(){
     const models = (h.backend && h.backend.models) || [];
     const loras = (h.backend && h.backend.loras) || [];
     const CURATED = ["cagliostrolab/animagine-xl-4.0",
-                     "circlestone-labs/Anima-Base-v1.0-Diffusers",
                      "stabilityai/stable-diffusion-xl-base-1.0"];
     const all = [...new Set([...models, ...CURATED])];
     const fm = $("f-model"), fmc = $("f-model-custom"), fl = $("f-lora"), dl = $("modelList");

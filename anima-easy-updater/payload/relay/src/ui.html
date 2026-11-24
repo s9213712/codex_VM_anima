@@ -90,7 +90,12 @@
         <label>提示詞</label>
         <select id="recent" style="margin-bottom:6px"><option value="">最近用過的提示詞…</option></select>
         <textarea id="prompt" placeholder="描述你想要的畫面…"></textarea>
-        <label>負面提示詞</label>
+        <label>模型</label>
+      <select id="f-model" style="margin-bottom:6px"></select>
+      <label>LoRA</label>
+      <select id="f-lora" style="margin-bottom:6px"></select>
+      <label style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><input type="checkbox" id="f-turbo"> Turbo LoRA（快，8 步；取消則標準 30 步）</label>
+      <label>負面提示詞</label>
         <input id="neg" type="text" value="low quality, blurry">
         <div class="row">
           <div>
@@ -188,6 +193,13 @@ async function refresh(){
     const cpu = h.agent?.system?.cpu, mem = h.agent?.system?.memory;
     $("s-res").textContent = cpu ? `${cpu.quota_usage_percent ?? "?"}% · ${(mem.used_bytes/1e9).toFixed(1)}/${(mem.limit_bytes/1e9).toFixed(0)} GB` : "—";
     $("s-err").textContent = h.last_error || "—";
+    const models = (h.backend && h.backend.models) || [];
+    const loras = (h.backend && h.backend.loras) || [];
+    const fm = $("f-model"), fl = $("f-lora");
+    if(fm.options.length !== models.length + 1){
+      fm.innerHTML = models.map(m=>`<option>${m}</option>`).join("") || '<option value="">JANKUTrainedChenkinNoobai_v777.safetensors</option>';
+      fl.innerHTML = '<option value="">不用 LoRA</option>' + loras.map(l=>`<option>${l}</option>`).join("");
+    }
     if(h.policy) $("s-policy").textContent = `代理逾時 ${h.policy.soft_queue_seconds}s 排隊 / ${h.policy.hard_reject_seconds}s 拒絕 · 租約 ${h.policy.lease_seconds/60} 分`;
   }catch(e){
     setConn("bad", "連線失敗");
@@ -313,7 +325,7 @@ async function submit(){
   let queued = 0, offline = false;
   try{
     for(let i=0;i<batch;i++){
-      const body = { prompt, negative_prompt: $("neg").value, width, height, steps, seed: baseSeed + i };
+      const body = { prompt, negative_prompt: $("neg").value, width, height, steps, seed: baseSeed + i , model: $("f-model").value, lora: $("f-lora").value, turbo: $("f-turbo").checked};
       const r = await api("/v1/generations", { method:"POST", body: JSON.stringify(body) });
       const j = await r.json();
       jobs.unshift(j.id); localStorage.setItem(LS.jobs, JSON.stringify(jobs));
@@ -377,6 +389,7 @@ $("go").onclick = submit;
 applyCfg();
 renderRecent();
 refresh();
+$("f-turbo").addEventListener("change", e=>{ const st=$("steps") || document.querySelector("[id*=step]"); if(st){ st.value = e.target.checked ? 8 : 30; } });
 timer = setInterval(()=>{ if(cfg.key && !document.hidden) refresh(); }, 4000);
 setInterval(()=>{ if(cfg.key && !document.hidden && (window.scrollY <= 40) && !document.querySelector(".bar")) refreshJobs(true); }, 4000);
 </script>

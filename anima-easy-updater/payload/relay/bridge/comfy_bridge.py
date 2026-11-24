@@ -89,6 +89,36 @@ class Comfy:
 
     def generate(self, job: dict) -> bytes:
         graph = self._fill(self.workflow, job)
+        # 模型選擇：主模型 JANKU v777 為預設，可用 model 覆蓋
+        model = (job.get("model") or "").strip()
+        if model:
+            for node in graph.values():
+                if node.get("class_type") == "CheckpointLoaderSimple":
+                    node["inputs"]["ckpt_name"] = model
+        # LoRA：turbo 走 anima-turbo-lora-v0.2；也可指定其他 lora 名稱
+        turbo = bool(job.get("turbo"))
+        lora = (job.get("lora") or "").strip() or ("anima-turbo-lora-v0.2.safetensors" if turbo else "")
+        if lora:
+            clip_skip = {"class_type": "CLIPSetLastLayer", "inputs": {"stop_at_clip_layer": -2}}
+            loader = {"class_type": "LoraLoader",
+                      "inputs": {"lora_name": lora, "strength_model": 1.0, "strength_clip": 1.0}}
+            for nid, node in list(graph.items()):
+                inp = node.get("inputs", {})
+                if node.get("class_type") == "KSampler":
+                    if "model" in inp and isinstance(inp["model"], list):
+                        loader["inputs"]["model"] = inp["model"]
+                        inp["model"] = ["lora_dyn", 0]
+                    if "positive" in inp and isinstance(inp["positive"], list):
+                        clip_skip["inputs"]["clip"] = ["lora_dyn", 1]
+                        inp["positive"] = ["clip_skip_dyn", 0]
+                    if "negative" in inp and isinstance(inp["negative"], list):
+                        inp["negative"] = ["clip_skip_dyn", 1]
+            graph["lora_dyn"] = loader
+            graph["clip_skip_dyn"] = clip_skip
+        # 步數：turbo 8 步，非 turbo 30 步
+        for node in graph.values():
+            if node.get("class_type") == "KSampler":
+                node["inputs"]["steps"] = 8 if turbo else 30
         try:
             graph = self._two_pass(graph, int(job.get("width") or 512), int(job.get("height") or 512))
         except Exception:
@@ -113,6 +143,74 @@ class Comfy:
         raise TimeoutError("ComfyUI job exceeded 15 minutes")
 
 
+
+DOWNLOADS: dict[str, dict] = {}   # name -> {status, kind, got, total, error}
+
+
+def _models_root(kind: str) -> pathlib.Path:
+    """ComfyUI models 對應資料夾（找得到就回實際路徑）。"""
+    env = os.environ.get("COMFY_MODELS_ROOT")
+    cands = []
+    if env:
+        cands.append(pathlib.Path(env))
+    cands += [pathlib.Path("D:/ComfyUI_windows_portable/ComfyUI/models"),
+              pathlib.Path.home() / "ComfyUI/ComfyUI/models"]
+    root = next((c for c in cands if c.is_dir()), None)
+    if root is None:
+        raise RuntimeError("找不到 ComfyUI models 資料夾，請設 COMFY_MODELS_ROOT")
+    sub = {"checkpoint": "checkpoints", "lora": "loras", "diffusion": "diffusion_models/community"}[kind]
+    d = root / sub
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _download(url: str, kind: str, name: str) -> None:
+    import time as _t
+    entry = DOWNLOADS.setdefault(name, {"status": "downloading", "kind": kind, "got": 0, "total": 0})
+    try:
+        if "civitai.com" in url and "token=" not in url:
+            tok = os.environ.get("CIVITAI_TOKEN", "")
+            if tok:
+                url += ("&" if "?" in url else "?") + "token=" + tok
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=60) as res:
+            total = int(res.headers.get("Content-Length") or 0)
+            entry["total"] = total
+            dest = _models_root(kind) / name
+            got = 0
+            with open(dest, "wb") as f:
+                while True:
+                    chunk = res.read(1 << 20)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    got += len(chunk)
+                    entry["got"] = got
+        entry["status"] = "done"
+        log(f"模型下載完成 {name}（{got/1e6:.0f} MB）")
+    except Exception as exc:
+        entry["status"] = "error"
+        entry["error"] = str(exc)[:200]
+        log("模型下載失敗 " + name + ": " + str(exc)[:120])
+
+
+def start_download(url: str, kind: str, name: str) -> dict:
+    import threading
+    if not re.match(r"^https://(huggingface\.co|hf-mirror\.com|civitai\.com)/", url):
+        return {"ok": False, "error": "只接受 huggingface.co 或 civitai.com 網址"}
+    if name in DOWNLOADS and DOWNLOADS[name]["status"] == "downloading":
+        return {"ok": False, "error": "同名模型下載中"}
+    if not name.endswith(".safetensors"):
+        name += ".safetensors"
+    DOWNLOADS[name] = {"status": "downloading", "kind": kind, "got": 0, "total": 0}
+    threading.Thread(target=_download, args=(url, kind, name), daemon=True).start()
+    return {"ok": True, "name": name}
+
+
+def download_status() -> list:
+    return [{"name": k, **v} for k, v in DOWNLOADS.items()]
+
+
 COMFY: Comfy | None = None
 TOKEN = os.environ.get("BRIDGE_TOKEN", "")
 
@@ -132,6 +230,30 @@ class Handler(BaseHTTPRequestHandler):
         self._send(code, json.dumps(obj).encode(), "application/json")
 
     def do_GET(self):
+        if self.path.startswith("/models/download") and "name=" in self.path:
+            from urllib.parse import urlparse, parse_qs
+            q = parse_qs(urlparse(self.path).query)
+            name = q.get("name", [""])[0]
+            return self._json(200, {"status": DOWNLOADS.get(name, {"status": "unknown"})})
+        if self.path == "/models":
+            models = loras = []
+            try:
+                info = COMFY._json("/object_info", None) if COMFY else {}
+                models = info.get("CheckpointLoaderSimple", {}).get("input", {}).get("required", {})\
+                    .get("ckpt_name", [[], {}])[0]
+                loras = info.get("LoraLoader", {}).get("input", {}).get("required", {})\
+                    .get("lora_name", [[], {}])[0]
+            except Exception:
+                pass
+            dm = []
+            try:
+                info2 = COMFY._json("/object_info", None) if COMFY else {}
+                dm = info2.get("UNETLoader", {}).get("input", {}).get("required", {})\
+                    .get("unet_name", [[], {}])[0]
+            except Exception:
+                pass
+            return self._json(200, {"checkpoints": models, "loras": loras,
+                                    "diffusion_models": dm, "downloads": download_status()})
         if self.path == "/healthz":
             import ctypes
 
@@ -155,6 +277,17 @@ class Handler(BaseHTTPRequestHandler):
         self._json(404, {"error": "not found"})
 
     def do_POST(self):
+        if self.path == "/models/download":
+            import json as _json
+            from urllib.parse import parse_qs, urlparse
+            ln = int(self.headers.get("Content-Length") or 0)
+            body = _json.loads(self.rfile.read(ln) or b"{}")
+            url = (body.get("url") or "").split("?download=true")[0]
+            kind = body.get("kind") or ("lora" if "/lora" in url else "checkpoint")
+            name = body.get("name") or url.rstrip("/").split("/")[-1].split("?")[0]
+            if "civitai.com/api/download" in url:
+                name = (body.get("name") or "civitai_" + url.rstrip("/").split("/")[-1]) + ".safetensors"
+            return self._json(200, start_download(url, kind, name))
         if self.path != "/generate":
             return self._json(404, {"error": "not found"})
         if not TOKEN or self.headers.get("Authorization") != "Bearer " + TOKEN:

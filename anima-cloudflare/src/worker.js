@@ -44,6 +44,24 @@ export class AnimaRelayV2 {
           })() : {online:false, models:[], loras:[]},policy:{soft_queue_seconds:AGENT_SOFT_MS/1000,hard_reject_seconds:AGENT_HARD_MS/1000,lease_seconds:LEASE_MS/1000,pending_max_seconds:PENDING_MAX_MS/1000},
           agent});
       }
+      if(path==="/v1/backend" && method==="GET"){
+        const m=this.rows("SELECT value FROM meta WHERE key='backend_mode'")[0];
+        const cu=this.rows("SELECT value FROM meta WHERE key='colab_url'")[0];
+        return json({mode:m?.value||"auto", colab_url:cu?.value||"",
+                     fallback_configured:!!this.env.FALLBACK_URL,
+                     choices:["auto","local","colab","vm"]});
+      }
+      if(path==="/v1/backend" && method==="POST"){
+        const b=await bodyJSON(request);
+        const mode=b.mode||"auto";
+        if(!["auto","local","colab","vm"].includes(mode))throw new HttpError(422,"mode must be auto|local|colab|vm");
+        this.sql.exec("DELETE FROM meta WHERE key='backend_mode'");this.sql.exec("INSERT INTO meta(key,value) VALUES('backend_mode',?)",mode);
+        if(typeof b.colab_url==="string"){
+          this.sql.exec("DELETE FROM meta WHERE key='colab_url'");this.sql.exec("INSERT INTO meta(key,value) VALUES('colab_url',?)",b.colab_url.trim());
+        }
+        const cu=this.rows("SELECT value FROM meta WHERE key='colab_url'")[0];
+        return json({ok:true, mode, colab_url:cu?.value||""});
+      }
       if(path==="/v1/system" && method==="GET"){
         const entry=this.rows("SELECT value FROM meta WHERE key='agent'")[0];const agent=entry?JSON.parse(entry.value):null;
         if(!agent?.system)throw new HttpError(503,"No authenticated VM resource snapshot available yet");
@@ -53,17 +71,23 @@ export class AnimaRelayV2 {
         const job=validJob(await bodyJSON(request));
         const hb=this.rows("SELECT value FROM meta WHERE key='agent'")[0];const hbAgent=hb?JSON.parse(hb.value):null;
         const gate=agentGate(hbAgent?now-hbAgent.observed_at:null);
-        const route=fallbackDecision(gate,!!this.env.FALLBACK_URL);
-        if(route==="reject")throw new HttpError(503,"Agent offline and no fallback backend configured");
+        const bmode=this.rows("SELECT value FROM meta WHERE key='backend_mode'")[0]?.value||"auto";
+        const colab=this.rows("SELECT value FROM meta WHERE key='colab_url'")[0]?.value||"";
+        let route=fallbackDecision(gate,!!this.env.FALLBACK_URL);
+        if(bmode==="local")route="fallback";
+        else if(bmode==="colab")route=colab?"colab":"reject";
+        else if(bmode==="vm")route=gate==="reject"?"reject":"primary";
+        if(route==="reject")throw new HttpError(503,bmode==="colab"?"Colab 後端尚未設定網址":"Agent offline and no fallback backend configured");
         const active=this.rows("SELECT count(*) AS n FROM jobs WHERE status IN ('PENDING','RUNNING')")[0].n;
         if(active>=2)throw new HttpError(429,"Queue full; retry after an existing task completes");
         const day=now-now%86400000;
         if(this.rows("SELECT count(*) AS n FROM jobs WHERE created>=?",day)[0].n>=20)throw new HttpError(429,"Daily application limit reached (20 jobs UTC)");
         const id=crypto.randomUUID();
-        if(route==="fallback"){
-          this.sql.exec("INSERT INTO jobs(id,status,request_json,created,started,backend) VALUES(?,'RUNNING',?,?,?,'fallback')",id,JSON.stringify(job),now,now);
-          this.ctx.waitUntil(this.runFallback(id,job));
-          return json({id,status:"RUNNING",backend:"fallback",status_url:`/v1/jobs/${id}`},202);
+        if(route==="fallback"||route==="colab"){
+          const base=route==="colab"?colab:this.env.FALLBACK_URL;
+          this.sql.exec("INSERT INTO jobs(id,status,request_json,created,started,backend) VALUES(?,'RUNNING',?,?,?,?)",id,JSON.stringify(job),now,base,route);
+          this.ctx.waitUntil(this.runFallback(id,job,base));
+          return json({id,status:"RUNNING",backend:route,status_url:`/v1/jobs/${id}`},202);
         }
         this.sql.exec("INSERT INTO jobs(id,status,request_json,created,backend) VALUES(?,'PENDING',?,?,'primary')",id,JSON.stringify(job),now);
         return json({id,status:"PENDING",backend:"primary",status_url:`/v1/jobs/${id}`,queued_while_agent_offline:gate==="queue"},202);
@@ -139,8 +163,8 @@ export class AnimaRelayV2 {
     }catch(e){return json({error:e instanceof HttpError?e.message:"Relay storage operation failed"},e instanceof HttpError?e.status:503);}
   }
 
-  async runFallback(id,job){
-    const base=this.env.FALLBACK_URL;
+  async runFallback(id,job,baseOverride){
+    const base=baseOverride||this.env.FALLBACK_URL;
     try{
       if(!base)throw new Error("Fallback not configured");
       const headers={"Content-Type":"application/json"};
@@ -151,7 +175,7 @@ export class AnimaRelayV2 {
       if(buf.length<8 || [137,80,78,71,13,10,26,10].some((x,i)=>buf[i]!==x))throw new Error("Fallback did not return a PNG");
       const digest=await crypto.subtle.digest("SHA-256",buf);
       const sha=Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,"0")).join("");
-      const metadata={engine:"fallback",endpoint:base,sha256:sha,finished_at:Date.now()};
+      const metadata={engine:this._lastRoute||"fallback",endpoint:base,sha256:sha,finished_at:Date.now()};
       this.sql.exec("UPDATE jobs SET status='SUCCEEDED',finished=?,metadata=?,image=? WHERE id=?",Date.now(),JSON.stringify(metadata),buf.buffer,id);
     }catch(e){
       this.sql.exec("UPDATE jobs SET status='FAILED',finished=?,error=? WHERE id=?",Date.now(),String(e.message||e).slice(0,2000),id);

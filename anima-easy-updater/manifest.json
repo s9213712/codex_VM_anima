@@ -1,5 +1,5 @@
 {
-  "version": "ui-stable-history",
+  "version": "backend-modes",
   "files": {
     "client/anima_client.py": "40046386a408ca7a9c59390e1efd615376f91a64037f56e7b0a3de246adf71ab",
     "client/cloud_task.py": "1d45cafe60060e9d7c1ce33948803ee2fcf94c20c3857517d6d22d48098ad729",
@@ -8,18 +8,18 @@
     "client/github_transport.py": "a8bf58bac21a93744f4fbd6ebf50a79812fc10ade416f188b26b7742427e7af7",
     "client/installed-version.json": "f7ffc9e8787e1988984f88ee76fc04b1b25dc6d85215f9bdfa8258c7ae2b2fc9",
     "client/start-windows.bat": "dae616183f93ebb0403c99de1ab3c0a4c2e6c7908384ca55f8adb9090a6d1d40",
-    "relay/src/worker.js": "e05948c72269dbb0778c3ba435780182f7242c2e96dc711e15a2b9ba08dac044",
-    "relay/src/logic.js": "e6a456f240060096890fc500d0329a3d4ad51faf933e77aed92fb2cebb1f0814",
-    "relay/src/ui.html": "2018e0d462d3a4a31a2dbb71104f3c3c6ef53a93287028489806faa477b40024",
-    "relay/src/ui.generated.js": "fa33a3cfa069f58a3c4b4c396e7e9c55d22cd7a1753c98d4657b556c89c64f66",
+    "relay/src/worker.js": "85e34a4213554089d4fdb11eab95cb1644362e74e3425160d7f140bfd5c9b2a0",
+    "relay/src/logic.js": "594d4468caeb1434a6d87da49f9b005bf15779b125f3e0775ca2029d2be15b8a",
+    "relay/src/ui.html": "4fcecd437adac18bc790a9a6da10b475683229120c140eed83f7a5e652c89f6f",
+    "relay/src/ui.generated.js": "efffacace7628d24d22b813bc9f1de4b62dba554f56918149966e38d980a948a",
     "relay/package.json": "286f74197320cb07b3ee12588c8346c1b7818c120a30f301356062f9fa08cf33",
     "relay/package-lock.json": "b113f80de8bc3a6b40ab949f2bd3be4f00b27075d3664d2506dcdc66ac9f4fe7",
     "relay/wrangler.jsonc": "69a68fcd5b9d4cdf3926b51ff1d257f01c008237f2a417d6c72b7e6a03183eb2",
-    "relay/test/relay.test.js": "5528abce42864ab7b788ab98605ca907232e6dd407464eccce8e8102696b452b",
+    "relay/test/relay.test.js": "f8b6f59cc87567f079eaa45e81bbef4eafcc65166783eea20ac89231c2ea6b05",
     "relay/scripts/build-ui.mjs": "1fc84152b8f441607ccef932b23dd16cd9a2e56d869bbab3ee74713a9d7aabd3",
     "relay/scripts/health.mjs": "df33e447228a2a975e3725ec42816760305ee1a13926b5981cc4a2cb8b87df63",
     "relay/README.txt": "ca140266cb614b80f166ff052f41dc434d8e05b3e96e6b2740284bb9f26824bd",
     "relay/vm/agent.py": "91620c99cee5d0899622bad3e35e84fd3d3f95b615a24906e28ca2f694cc3700",
-    "relay/bridge/comfy_bridge.py": "7927de5b96b42fc33e5198e770029a19574a8051ef2c3ae4b5d37989b7b0c66c"
+    "relay/bridge/comfy_bridge.py": "56b95f8c7c8fdcd3cfcd2ee9479a40911a628992ab2a0b1acaf5005b878a383e"
   }
 }

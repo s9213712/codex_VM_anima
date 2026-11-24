@@ -257,13 +257,15 @@ function renderExpired(id, blob){
   return el;
 }
 
-async function refreshJobs(){
+async function refreshJobs(force){
   const box = $("jobs");
   let server = null;
   try { server = (await (await api("/v1/jobs?limit=20")).json()).jobs; } catch(e) { server = null; }
 
   if(server){
     const ids = server.map(j => j.id);
+    const sig = JSON.stringify(server.map(j => [j.id, j.status]));
+    if(!force && (window.scrollY > 40 || box.matches(":hover"))) return;
     jobs = [...ids, ...jobs.filter(id => !ids.includes(id))].slice(0, 40);
     localStorage.setItem(LS.jobs, JSON.stringify(jobs));
     box.innerHTML = "";
@@ -376,6 +378,7 @@ applyCfg();
 renderRecent();
 refresh();
 timer = setInterval(()=>{ if(cfg.key && !document.hidden) refresh(); }, 4000);
+setInterval(()=>{ if(cfg.key && !document.hidden && (window.scrollY <= 40) && !document.querySelector(".bar")) refreshJobs(true); }, 4000);
 </script>
 </body>
 </html>

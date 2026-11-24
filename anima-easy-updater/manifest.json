@@ -1,5 +1,5 @@
 {
-  "version": "2026.11.24-relay6",
+  "version": "ui-stable-history",
   "files": {
     "client/anima_client.py": "40046386a408ca7a9c59390e1efd615376f91a64037f56e7b0a3de246adf71ab",
     "client/cloud_task.py": "1d45cafe60060e9d7c1ce33948803ee2fcf94c20c3857517d6d22d48098ad729",
@@ -10,8 +10,8 @@
     "client/start-windows.bat": "dae616183f93ebb0403c99de1ab3c0a4c2e6c7908384ca55f8adb9090a6d1d40",
     "relay/src/worker.js": "e05948c72269dbb0778c3ba435780182f7242c2e96dc711e15a2b9ba08dac044",
     "relay/src/logic.js": "e6a456f240060096890fc500d0329a3d4ad51faf933e77aed92fb2cebb1f0814",
-    "relay/src/ui.html": "d8318621ab2dabd373a777f97eb4d98156514b653ee853e035c8c761b79851c9",
-    "relay/src/ui.generated.js": "598ffe297b3fbe560c092a411a15e04ca1c18a289b9a842e6f645d87488b9740",
+    "relay/src/ui.html": "2018e0d462d3a4a31a2dbb71104f3c3c6ef53a93287028489806faa477b40024",
+    "relay/src/ui.generated.js": "fa33a3cfa069f58a3c4b4c396e7e9c55d22cd7a1753c98d4657b556c89c64f66",
     "relay/package.json": "286f74197320cb07b3ee12588c8346c1b7818c120a30f301356062f9fa08cf33",
     "relay/package-lock.json": "b113f80de8bc3a6b40ab949f2bd3be4f00b27075d3664d2506dcdc66ac9f4fe7",
     "relay/wrangler.jsonc": "69a68fcd5b9d4cdf3926b51ff1d257f01c008237f2a417d6c72b7e6a03183eb2",
@@ -20,6 +20,6 @@
     "relay/scripts/health.mjs": "df33e447228a2a975e3725ec42816760305ee1a13926b5981cc4a2cb8b87df63",
     "relay/README.txt": "ca140266cb614b80f166ff052f41dc434d8e05b3e96e6b2740284bb9f26824bd",
     "relay/vm/agent.py": "91620c99cee5d0899622bad3e35e84fd3d3f95b615a24906e28ca2f694cc3700",
-    "relay/bridge/comfy_bridge.py": "31a7c396b13904b4aafa3fd047239efcda43447e35ea07fc8c9028f094346105"
+    "relay/bridge/comfy_bridge.py": "7927de5b96b42fc33e5198e770029a19574a8051ef2c3ae4b5d37989b7b0c66c"
   }
 }

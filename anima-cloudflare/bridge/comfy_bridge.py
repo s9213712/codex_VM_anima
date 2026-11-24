@@ -70,8 +70,29 @@ class Comfy:
         except Exception:
             return False
 
+    @staticmethod
+    def _two_pass(graph: dict, width: int, height: int) -> dict:
+        # 生成小圖後 lanczos 放大到目標（3050 4GB 友善）
+        small_w, small_h = max(320, width // 2), max(320, height // 2)
+        for node in graph.values():
+            if node.get("class_type") == "EmptyLatentImage":
+                node["inputs"]["width"], node["inputs"]["height"] = small_w, small_h
+        decode = next((nid for nid, n in graph.items() if n.get("class_type") == "VAEDecode"), None)
+        save = next((nid for nid, n in graph.items() if n.get("class_type") == "SaveImage"), None)
+        if not (decode and save):
+            return graph
+        graph["scale_up"] = {"class_type": "ImageScale",
+                             "inputs": {"upscale_method": "lanczos", "width": width, "height": height,
+                                        "crop": "disabled", "image": [decode, 0]}}
+        graph[save]["inputs"]["images"] = ["scale_up", 0]
+        return graph
+
     def generate(self, job: dict) -> bytes:
         graph = self._fill(self.workflow, job)
+        try:
+            graph = self._two_pass(graph, int(job.get("width") or 512), int(job.get("height") or 512))
+        except Exception:
+            pass
         prompt_id = self._json("/prompt", {"prompt": graph, "client_id": self.client_id})["prompt_id"]
         deadline = time.time() + 900
         while time.time() < deadline:
@@ -112,7 +133,25 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/healthz":
-            return self._json(200, {"ok": True, "comfy": "up" if COMFY and COMFY.up() else "down"})
+            import ctypes
+
+            class _MS(ctypes.Structure):
+                _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                            ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                            ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
+                            ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
+                            ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+            mem = None
+            try:
+                st = _MS(ctypes.sizeof(_MS))
+                ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(st))
+                mem = {"used": round((st.ullTotalPhys - st.ullAvailPhys) / 1e9, 1),
+                       "total": round(st.ullTotalPhys / 1e9, 1), "percent": st.dwMemoryLoad}
+            except Exception:
+                pass
+            return self._json(200, {"ok": True, "comfy": "up" if COMFY and COMFY.up() else "down",
+                                    "system": {"memory": mem,
+                                               "gpu": "RTX 3050 Laptop (fallback host)"}})
         self._json(404, {"error": "not found"})
 
     def do_POST(self):

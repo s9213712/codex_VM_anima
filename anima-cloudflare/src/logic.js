@@ -53,6 +53,7 @@ function validJob(input){
   job.model = typeof input.model === "string" ? input.model.slice(0, 120) : "";
   job.lora = typeof input.lora === "string" ? input.lora.slice(0, 120) : "";
   job.turbo = input.turbo === true;
+  job.base_family = typeof input.base_family === "string" && ["sdxl-single","generic","anima"].includes(input.base_family) ? input.base_family : "";
   if(job.model && !/^[\w.\- \/()]+$/.test(job.model))throw new HttpError(422,"Invalid model name");
   if(job.lora && !/^[\w.\- ]+$/.test(job.lora))throw new HttpError(422,"Invalid lora name");
   if(Object.keys(input).some(k=>!Object.hasOwn(job,k)))throw new HttpError(422,"Unknown job field");

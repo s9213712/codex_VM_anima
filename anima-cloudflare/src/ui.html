@@ -99,8 +99,9 @@
         <label>提示詞</label>
         <select id="recent" style="margin-bottom:6px"><option value="">最近用過的提示詞…</option></select>
         <textarea id="prompt" placeholder="描述你想要的畫面…"></textarea>
-        <label>模型</label>
-      <select id="f-model" style="margin-bottom:6px"></select>
+        <label>模型（可輸入任意 HF repo id，後端自動下載）</label>
+      <input id="f-model" list="modelList" style="margin-bottom:6px;background:var(--card2);color:var(--tx);border:1px solid #33406e;border-radius:8px;padding:6px;width:100%" placeholder="JANKU v777 或輸入 HF repo id">
+      <datalist id="modelList"></datalist>
       <label>LoRA</label>
       <select id="f-lora" style="margin-bottom:6px"></select>
       <label style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><input type="checkbox" id="f-turbo"> Turbo LoRA（快，8 步；取消則標準 30 步）</label>
@@ -210,9 +211,16 @@ async function refresh(){
     }
     const models = (h.backend && h.backend.models) || [];
     const loras = (h.backend && h.backend.loras) || [];
-    const fm = $("f-model"), fl = $("f-lora");
-    if(fm.options.length !== models.length + 1){
-      fm.innerHTML = models.map(m=>`<option>${m}</option>`).join("") || '<option value="">JANKUTrainedChenkinNoobai_v777.safetensors</option>';
+    const CURATED = ["cagliostrolab/animagine-xl-4.0",
+                     "circlestone-labs/Anima-Base-v1.0-Diffusers",
+                     "stabilityai/stable-diffusion-xl-base-1.0"];
+    const all = [...new Set([...models, ...CURATED])];
+    const fm = $("f-model"), fl = $("f-lora"), dl = $("modelList");
+    if(dl.options.length !== all.length){
+      dl.innerHTML = all.map(m=>`<option value="${m}">${m.includes("/")?"HF:"+m:m}</option>`).join("");
+      if(!fm.value) fm.value = models[0] || CURATED[0];
+    }
+    if(fl.options.length !== loras.length + 1){
       fl.innerHTML = '<option value="">不用 LoRA</option>' + loras.map(l=>`<option>${l}</option>`).join("");
     }
     if(h.policy) $("s-policy").textContent = `代理逾時 ${h.policy.soft_queue_seconds}s 排隊 / ${h.policy.hard_reject_seconds}s 拒絕 · 租約 ${h.policy.lease_seconds/60} 分`;

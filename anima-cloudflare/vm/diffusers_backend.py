@@ -93,7 +93,10 @@ def load_pipe(model: str):
     else:
         pipe = DiffusionPipeline.from_pretrained(src, torch_dtype=dtype)
     if torch.cuda.is_available():
-        pipe.to("cuda")
+        try:
+            pipe.enable_model_cpu_offload()   # 4GB 卡放不下整支 SDXL，讓 diffusers 分層搬運
+        except Exception:
+            pipe.to("cuda")
         pipe.enable_attention_slicing()
     else:
         pipe.enable_attention_slicing()

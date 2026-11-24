@@ -199,21 +199,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def _cpu(self):
         try:
-            import ctypes, time
-            if not hasattr(self.server, "_cpu_last"):
-                class KT(ctypes.Structure):
-                    _fields_ = [("idle", ctypes.c_ulonglong), ("kernel", ctypes.c_ulonglong), ("user", ctypes.c_ulonglong)]
-                idle, kernel, user = KT(), KT(), KT()
-                ctypes.windll.kernel32.GetSystemTimes(ctypes.byref(idle), ctypes.byref(kernel), ctypes.byref(user))
-                self.server._cpu_last = (time.time(), idle.idle + kernel.idle, kernel.kernel + kernel.user + user.user + user.idle)
-            t0, i0, b0 = self.server._cpu_last
-            time.sleep(0.15)
-            idle, kernel, user = KT(), KT(), KT()
-            ctypes.windll.kernel32.GetSystemTimes(ctypes.byref(idle), ctypes.byref(kernel), ctypes.byref(user))
-            i1, b1 = idle.idle + kernel.idle, kernel.kernel + kernel.user + user.user + user.idle
-            self.server._cpu_last = (time.time(), i1, b1)
-            dt, di, db = b1 - b0, i1 - i0, b1 - b0
-            return round(100.0 * (1.0 - di / dt), 1) if dt > 0 else None
+            import psutil
+            return psutil.cpu_percent(interval=0.15)
         except Exception:
             return None
 

@@ -79,9 +79,8 @@ export class AnimaRelayV2 {
         else if(bmode==="vm")route=gate==="reject"?"reject":"primary";
         if(route==="reject")throw new HttpError(503,bmode==="colab"?"Colab 後端尚未設定網址":"Agent offline and no fallback backend configured");
         const active=this.rows("SELECT count(*) AS n FROM jobs WHERE status IN ('PENDING','RUNNING')")[0].n;
-        if(active>=2)throw new HttpError(429,"Queue full; retry after an existing task completes");
+        if(active>=4)throw new HttpError(429,"Queue full; retry after an existing task completes");
         const day=now-now%86400000;
-        if(this.rows("SELECT count(*) AS n FROM jobs WHERE created>=?",day)[0].n>=20)throw new HttpError(429,"Daily application limit reached (20 jobs UTC)");
         const id=crypto.randomUUID();
         if(route==="fallback"||route==="colab"){
           const base=route==="colab"?colab:this.env.FALLBACK_URL;

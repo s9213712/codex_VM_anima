@@ -1,5 +1,5 @@
 {
-  "version": "backend-modes",
+  "version": "backend-mode-ui",
   "files": {
     "client/anima_client.py": "40046386a408ca7a9c59390e1efd615376f91a64037f56e7b0a3de246adf71ab",
     "client/cloud_task.py": "1d45cafe60060e9d7c1ce33948803ee2fcf94c20c3857517d6d22d48098ad729",
@@ -10,8 +10,8 @@
     "client/start-windows.bat": "dae616183f93ebb0403c99de1ab3c0a4c2e6c7908384ca55f8adb9090a6d1d40",
     "relay/src/worker.js": "85e34a4213554089d4fdb11eab95cb1644362e74e3425160d7f140bfd5c9b2a0",
     "relay/src/logic.js": "594d4468caeb1434a6d87da49f9b005bf15779b125f3e0775ca2029d2be15b8a",
-    "relay/src/ui.html": "4fcecd437adac18bc790a9a6da10b475683229120c140eed83f7a5e652c89f6f",
-    "relay/src/ui.generated.js": "efffacace7628d24d22b813bc9f1de4b62dba554f56918149966e38d980a948a",
+    "relay/src/ui.html": "15c633ce6ed8d8ac32f15d5705170bd38117d30f8cb39051edbb27f8081226f3",
+    "relay/src/ui.generated.js": "febde2bd0a0d229929dbf95f1a44140424ff4259da7a6c0e3f28fb686a20205c",
     "relay/package.json": "286f74197320cb07b3ee12588c8346c1b7818c120a30f301356062f9fa08cf33",
     "relay/package-lock.json": "b113f80de8bc3a6b40ab949f2bd3be4f00b27075d3664d2506dcdc66ac9f4fe7",
     "relay/wrangler.jsonc": "69a68fcd5b9d4cdf3926b51ff1d257f01c008237f2a417d6c72b7e6a03183eb2",

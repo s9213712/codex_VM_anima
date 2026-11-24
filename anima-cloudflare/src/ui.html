@@ -78,6 +78,15 @@
         <div class="stat"><span>Relay</span><span id="s-relay">—</span></div>
         <div class="stat"><span>VM 代理</span><span id="s-agent">—</span></div>
         <div class="stat"><span>執行後端</span><span id="s-backend">—</span></div>
+        <div class="stat"><span>後端模式</span>
+          <select id="modeSel" style="background:var(--card2);color:var(--tx);border:1px solid #33406e;border-radius:8px;padding:2px 6px;font-size:12px">
+            <option value="auto">自動</option>
+            <option value="local">本地 Python（Nitro5）</option>
+            <option value="colab">Colab CLI</option>
+            <option value="vm">VM（Codex）</option>
+          </select></div>
+        <div class="stat" id="colabRow" style="display:none"><span>Colab 網址</span>
+          <input id="colabUrl" placeholder="https://xxxx.trycloudflare.com" style="background:var(--card2);color:var(--tx);border:1px solid #33406e;border-radius:8px;padding:2px 6px;font-size:12px;width:170px"></div>
         <div class="stat"><span>模型</span><span id="s-model">—</span></div>
         <div class="stat"><span>佇列</span><span id="s-queue">—</span></div>
         <div class="stat"><span>CPU / 記憶體</span><span id="s-res">—</span></div>
@@ -193,6 +202,12 @@ async function refresh(){
     const cpu = h.agent?.system?.cpu, mem = h.agent?.system?.memory;
     $("s-res").textContent = cpu ? `${cpu.quota_usage_percent ?? "?"}% · ${(mem.used_bytes/1e9).toFixed(1)}/${(mem.limit_bytes/1e9).toFixed(0)} GB` : "—";
     $("s-err").textContent = h.last_error || "—";
+    const be = h.backend || {};
+    if(be.online !== undefined && !online){
+      $("s-backend").innerHTML = be.online
+        ? '<span class="dot ok"></span>PC fallback（diffusers，在線）'
+        : '<span class="dot bad"></span>PC fallback（離線）';
+    }
     const models = (h.backend && h.backend.models) || [];
     const loras = (h.backend && h.backend.loras) || [];
     const fm = $("f-model"), fl = $("f-lora");
@@ -390,6 +405,26 @@ applyCfg();
 renderRecent();
 refresh();
 $("f-turbo").addEventListener("change", e=>{ const st=$("steps") || document.querySelector("[id*=step]"); if(st){ st.value = e.target.checked ? 8 : 30; } });
+async function loadMode(){
+  try{
+    const m = await (await api("/v1/backend")).json();
+    $("modeSel").value = m.mode || "auto";
+    $("colabUrl").value = m.colab_url || "";
+    $("colabRow").style.display = m.mode === "colab" ? "flex" : "none";
+  }catch(e){}
+}
+$("modeSel").addEventListener("change", async e=>{
+  const body = {mode: e.target.value};
+  if(e.target.value === "colab" && $("colabUrl").value) body.colab_url = $("colabUrl").value.trim();
+  const r = await api("/v1/backend", {method:"POST", body: JSON.stringify(body)});
+  toast(r.mode ? "後端模式 → " + r.mode : "設定失敗");
+  if(r.colab_url !== undefined) $("colabUrl").value = r.colab_url;
+});
+$("colabUrl").addEventListener("change", async e=>{
+  const r = await api("/v1/backend", {method:"POST", body: JSON.stringify({mode:"colab", colab_url:e.target.value.trim()})});
+  toast(r.ok ? "Colab 網址已儲存" : "儲存失敗");
+});
+loadMode();
 timer = setInterval(()=>{ if(cfg.key && !document.hidden) refresh(); }, 4000);
 setInterval(()=>{ if(cfg.key && !document.hidden && (window.scrollY <= 40) && !document.querySelector(".bar")) refreshJobs(true); }, 4000);
 </script>

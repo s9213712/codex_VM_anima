@@ -11,7 +11,7 @@ test("logic module loads without the Worker runtime", () => {
 });
 
 test("validJob accepts a complete job", () => {
-  assert.deepEqual(validJob(GOOD), GOOD);
+  assert.deepEqual(validJob(GOOD), { ...GOOD, model: "", lora: "", turbo: false });
 });
 
 test("validJob applies documented defaults", () => {

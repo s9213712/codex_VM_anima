@@ -27,7 +27,21 @@ export class AnimaRelayV2 {
         const lastError=this.rows("SELECT error FROM jobs WHERE status='FAILED' AND error IS NOT NULL ORDER BY finished DESC LIMIT 1")[0]?.error ?? null;
         return json({relay:"READY",agent_recent:!!agent && now-agent.observed_at<60000,agent_age_seconds:age,
           pending,running,last_error:lastError,
-          fallback_configured:!!this.env.FALLBACK_URL,policy:{soft_queue_seconds:AGENT_SOFT_MS/1000,hard_reject_seconds:AGENT_HARD_MS/1000,lease_seconds:LEASE_MS/1000,pending_max_seconds:PENDING_MAX_MS/1000},
+          fallback_configured:!!this.env.FALLBACK_URL,
+          backend: (this.env.FALLBACK_URL && !(agent && now-agent.observed_at<60000)) ? await (async()=>{
+            try{
+              const r=await fetch(this.env.FALLBACK_URL+"/healthz",
+                {headers:{Authorization:"Bearer "+(this.env.FALLBACK_KEY||"")}, signal:AbortSignal.timeout(4000)});
+              const j=await r.json();
+              let models=[],loras=[];
+              try{
+                const mr=await fetch(this.env.FALLBACK_URL+"/models",
+                  {headers:{Authorization:"Bearer "+(this.env.FALLBACK_KEY||"")}, signal:AbortSignal.timeout(4000)});
+                const mm=await mr.json(); models=mm.checkpoints||[]; loras=mm.loras||[];
+              }catch{}
+              return {online:j.ok===true, system:j.system||null, models, loras};
+            }catch{ return {online:false, models:[], loras:[]}; }
+          })() : {online:false, models:[], loras:[]},policy:{soft_queue_seconds:AGENT_SOFT_MS/1000,hard_reject_seconds:AGENT_HARD_MS/1000,lease_seconds:LEASE_MS/1000,pending_max_seconds:PENDING_MAX_MS/1000},
           agent});
       }
       if(path==="/v1/system" && method==="GET"){
@@ -158,7 +172,7 @@ export default {
         return json({build:"v2-liveness",service:"Anima HTTPS image-job relay",authentication:"Bearer required",ui:"/ui",docs:"POST /v1/generations, then poll returned status_url"});
       }
       await authenticate(request,path.startsWith("/agent/")?env.AGENT_KEY:env.CLIENT_KEY);
-      return await env.RELAY.get(env.RELAY.idFromName(env.RELAY_INSTANCE || "single-approved-image-worker-v4")).fetch(request);
+      return await env.RELAY.get(env.RELAY.idFromName(env.RELAY_INSTANCE || "single-approved-image-worker-v5")).fetch(request);
     }catch(e){return json({error:e instanceof HttpError?e.message:"Relay temporarily unavailable"},e instanceof HttpError?e.status:503);}
 
   }

@@ -50,6 +50,11 @@ function validJob(input){
   if(!Number.isInteger(job.steps)||job.steps<1||job.steps>20)throw new HttpError(422,"steps must be 1..20");
   if(!Number.isInteger(job.seed)||job.seed<0||job.seed>4294967295)throw new HttpError(422,"Invalid seed");
   // Reject data that could turn this application relay into arbitrary URL/command forwarding.
+  job.model = typeof input.model === "string" ? input.model.slice(0, 120) : "";
+  job.lora = typeof input.lora === "string" ? input.lora.slice(0, 120) : "";
+  job.turbo = input.turbo === true;
+  if(job.model && !/^[\w.\- \/()]+$/.test(job.model))throw new HttpError(422,"Invalid model name");
+  if(job.lora && !/^[\w.\- ]+$/.test(job.lora))throw new HttpError(422,"Invalid lora name");
   if(Object.keys(input).some(k=>!Object.hasOwn(job,k)))throw new HttpError(422,"Unknown job field");
   return job;
 }

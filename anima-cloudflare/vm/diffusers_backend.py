@@ -78,6 +78,9 @@ def guess_family(source: str) -> str:
     return "generic"
 
 
+_PIPE_CACHE = {}
+
+
 def load_pipe(model: str, family_override: str = ""):
     import torch
     from diffusers import DiffusionPipeline, StableDiffusionXLPipeline
@@ -86,6 +89,10 @@ def load_pipe(model: str, family_override: str = ""):
         family = guess_family(src)
     if family_override:
         family = family_override
+    key = (str(src), family)
+    if key in _PIPE_CACHE:
+        log("快取命中 " + str(src))
+        return _PIPE_CACHE[key]
     log(f"載入 {src}（family={family}）")
     dtype = torch.float16 if torch.cuda.is_available() else torch.float32
     if family == "sdxl-single":
@@ -108,6 +115,8 @@ def load_pipe(model: str, family_override: str = ""):
             pass
     with _lock:
         _pipes.clear()
+        _PIPE_CACHE.clear()
+        _PIPE_CACHE[key] = pipe
         _pipes[model] = pipe
     return pipe
 
@@ -218,6 +227,16 @@ class Handler(BaseHTTPRequestHandler):
             return []
 
     def do_GET(self):
+        if self.path.startswith("/preload"):
+            from urllib.parse import urlparse, parse_qs
+            q = parse_qs(urlparse(self.path).query)
+            model = (q.get("model") or [DEFAULT_MODEL])[0]
+            fam = (q.get("family") or [""])[0]
+            try:
+                load_pipe(model, fam)
+                return self._json(200, {"ok": True, "model": model})
+            except Exception as exc:
+                return self._json(500, {"ok": False, "error": str(exc)[:200]})
         if self.path == "/healthz":
             cpu = self._cpu()
             mem = self._mem()

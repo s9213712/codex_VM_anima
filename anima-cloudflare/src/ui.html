@@ -230,13 +230,17 @@ async function refresh(){
                      "circlestone-labs/Anima",
                      "ricecake/Krea-2-Anime-tuned-Raw",
                      "ricecake/Krea-2-Anime-tuned-Turbo",
-                     "Comfy-Org/Qwen-Image-2.1",
+                     "Qwen/Qwen-Image",
                      "OpenMOSS-Team/MOSS-Image-Base",
                      "stabilityai/stable-diffusion-xl-base-1.0"];
+    const CURATED_NOTE = {"circlestone-labs/Anima": "（架構暫不支援）",
+                          "ricecake/Krea-2-Anime-tuned-Raw": "（需 HF 授權）",
+                          "ricecake/Krea-2-Anime-tuned-Turbo": "（需 HF 授權）",
+                          "OpenMOSS-Team/MOSS-Image-Base": "（架構暫不支援）"};
     const all = [...new Set([...models, ...CURATED])];
     const fm = $("f-model"), fmc = $("f-model-custom"), fl = $("f-lora"), dl = $("modelList");
     if(fm.options.length !== all.length + 1){
-      fm.innerHTML = all.map(m=>`<option value="${m}">${m.includes("/")?"HF: "+m:m}${models.includes(m)?" ✓":""}</option>`).join("") + '<option value="__custom__">自訂（輸入 HF repo id…）</option>';
+      fm.innerHTML = all.map(m=>`<option value="${m}">${m.includes("/")?"HF: "+m:m}${models.includes(m)?" ✓":""}${CURATED_NOTE[m]||""}</option>`).join("") + '<option value="__custom__">自訂（輸入 HF repo id…）</option>';
       dl.innerHTML = all.map(m=>`<option value="${m}"></option>`).join("");
       if(!fm.value || ![...fm.options].some(o=>o.value===fm.value)) fm.value = models[0] || CURATED[0];
       fmc.style.display = fm.value === "__custom__" ? "" : "none";

@@ -73,6 +73,12 @@ def guess_family(source: str) -> str:
     low = source.lower()
     if "circlestone" in low and "diffusers" in low:
         return "anima-official"
+    if "qwen-image" in low:
+        return "qwen-image"
+    if "krea" in low:
+        return "krea-single"
+    if "moss-image" in low or "moss" in low:
+        return "moss"
     if "circlestone" in low or "anima-compile" in low or "anima-" in low:
         return "anima"
     if low.endswith(".safetensors") or low.endswith(".ckpt"):
@@ -92,12 +98,80 @@ def _load_anima_official(src: str, dtype):
     diffusers >= 0.43 原生支援），內含已轉換的 transformer/VAE/Qwen3-0.6B/
     AnimaTextConditioner/scheduler/t5_tokenizer。"""
     from diffusers import ModularPipeline
+    import torch
     # split_files 原始 repo（circlestone-labs/Anima）沒有 modular_model_index.json，
     # 一律導向官方同步發布的 diffusers 格式 repo
     repo = src if "diffusers" in src.lower() else ANIMA_OFFICIAL_REPO
+    if dtype == torch.float16 and torch.cuda.is_available() and torch.cuda.is_bf16_supported():
+        dtype = torch.bfloat16   # fp16 會溢位輸出全黑（實測），Anima 官方建議 bf16
     pipe = ModularPipeline.from_pretrained(repo)
     pipe.load_components(dtype=dtype)
     return pipe
+
+
+def _load_qwen_image(src: str, dtype):
+    """Qwen-Image-2.1（20B）：bitsandbytes NF4 量化，T4 16GB / 本機 4GB 才放得下。"""
+    import torch
+    from diffusers import DiffusionPipeline
+    kwargs = {"torch_dtype": dtype}
+    try:
+        from diffusers import PipelineQuantizationConfig
+        kwargs["quantization_config"] = PipelineQuantizationConfig(
+            quant_kwargs={"load_in_4bit": True, "bnb_4bit_quant_type": "nf4",
+                          "bnb_4bit_compute_dtype": torch.float16})
+    except Exception:
+        from diffusers import BitsAndBytesConfig
+        kwargs["quantization_config"] = BitsAndBytesConfig(
+            load_in_4bit=True, bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.float16)
+    return DiffusionPipeline.from_pretrained(src, **kwargs)
+
+
+def _load_moss(src: str, dtype):
+    """MOSS-Image：pipeline 類別不在 diffusers 套件內，從 repo 根目錄的
+    pipeline_moss_image.py 動態載入 MOSSImagePipeline。權重 fp16 約 35GB，
+    Colab T4（15GB VRAM/12GB RAM）必須 NF4 量化；小 VRAM 主機用 fp16+offload。"""
+    import importlib.util, pathlib
+    import torch
+    from diffusers import BitsAndBytesConfig
+    from huggingface_hub import hf_hub_download
+    p = pathlib.Path(hf_hub_download(src, "pipeline_moss_image.py"))
+    spec = importlib.util.spec_from_file_location("moss_image_repo_code", p)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    kwargs = {"torch_dtype": dtype, "trust_remote_code": True}
+    if torch.cuda.is_available() and torch.cuda.get_device_properties(0).total_memory > 14e9:
+        kwargs["quantization_config"] = BitsAndBytesConfig(
+            load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=torch.float16)
+    return mod.MOSSImagePipeline.from_pretrained(src, **kwargs)
+
+
+def _load_krea_single(src: str, dtype):
+    """Krea 2（FLUX.2 系社群 finetune，ComfyUI 單檔）。優先 Flux2Pipeline.
+    from_single_file，失敗退 FluxPipeline.from_single_file，兩者錯誤都保留。"""
+    from diffusers import Flux2Pipeline, FluxPipeline
+    errs = []
+    for cls in (Flux2Pipeline, FluxPipeline):
+        try:
+            return cls.from_single_file(src, torch_dtype=dtype)
+        except Exception as exc:
+            errs.append(f"{cls.__name__}: {str(exc)[:220]}")
+    raise RuntimeError("Krea 單檔載入失敗（依序嘗試 Flux2/Flux from_single_file）→ " + " | ".join(errs))
+
+
+def _sdxl_single_source(src: str) -> str:
+    """sdxl-single 來源：repo id → hf_hub_download 出本地檔。"""
+    if src.startswith("http") or os.path.exists(src):
+        return src
+    from huggingface_hub import hf_hub_download, list_repo_files
+    if src.endswith(".safetensors"):
+        repo_id, fname = src.rsplit("/", 1)[0], src.rsplit("/", 1)[1]
+    else:
+        files = [f for f in list_repo_files(src) if f.endswith(".safetensors")]
+        if not files:
+            raise RuntimeError(f"repo {src} 內沒有 .safetensors")
+        repo_id, fname = src, sorted(files, key=len)[0]
+    return hf_hub_download(repo_id, fname)
 
 
 def _anima_compat(pipe) -> None:
@@ -112,24 +186,30 @@ def _anima_compat(pipe) -> None:
 def load_pipe(model: str, family_override: str = ""):
     import torch
     from diffusers import DiffusionPipeline, StableDiffusionXLPipeline
+    dtype = torch.float16 if torch.cuda.is_available() else torch.float32
     src, family = resolve_source(model, "checkpoint")
     if family == "auto":
         family = guess_family(src)
     if family_override:
         family = family_override
-    key = (str(src), family)
+    key = (str(src), family, str(dtype))
     if key in _PIPE_CACHE:
         log("快取命中 " + str(src))
         return _PIPE_CACHE[key]
     log(f"載入 {src}（family={family}）")
-    dtype = torch.float16 if torch.cuda.is_available() else torch.float32
     try:
         if family == "sdxl-single":
-            pipe = StableDiffusionXLPipeline.from_single_file(src, torch_dtype=dtype)
+            pipe = StableDiffusionXLPipeline.from_single_file(_sdxl_single_source(src), torch_dtype=dtype)
         elif family == "anima":
             pipe = DiffusionPipeline.from_pretrained(src, torch_dtype=dtype, trust_remote_code=True)
         elif family == "anima-official":
             pipe = _load_anima_official(src, dtype)
+        elif family == "qwen-image":
+            pipe = _load_qwen_image(src, dtype)
+        elif family == "krea-single":
+            pipe = _load_krea_single(src, dtype)
+        elif family == "moss":
+            pipe = _load_moss(src, dtype)
         else:
             pipe = DiffusionPipeline.from_pretrained(src, torch_dtype=dtype)
     except Exception as exc:
@@ -141,7 +221,9 @@ def load_pipe(model: str, family_override: str = ""):
         raise
     if family == "anima-official":
         pipe.to("cuda" if torch.cuda.is_available() else "cpu")
-    if torch.cuda.is_available():
+    elif family == "qwen-image" and torch.cuda.is_available():
+        pipe.enable_sequential_cpu_offload()   # NF4 20B：逐層搬運，慢但放得下
+    elif torch.cuda.is_available():
         try:
             pipe.to("cuda")
         except torch.cuda.OutOfMemoryError:
@@ -361,5 +443,9 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8899"))
+    (MODELS_DIR / "checkpoints").mkdir(parents=True, exist_ok=True)
+    (MODELS_DIR / "loras").mkdir(parents=True, exist_ok=True)
+    if not REGISTRY.exists():
+        save_registry({})
     log(f"diffusers-universal backend :{port}，模型目錄 {MODELS_DIR}")
     ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()

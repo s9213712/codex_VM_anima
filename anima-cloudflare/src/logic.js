@@ -4,7 +4,7 @@ const JSON_HEADERS = {"Content-Type":"application/json; charset=utf-8","Cache-Co
 const AGENT_SOFT_MS=90000;      // 超過 90 秒沒心跳：仍收單，但標記等待代理
 const AGENT_HARD_MS=300000;     // 超過 5 分鐘：直接拒絕新單
 const RETENTION_MS=7*24*60*60*1000; // 任務保留 7 天
-const LEASE_MS=900000;          // 15 分鐘租約（原本 35 分鐘）
+const LEASE_MS=3600000;          // 60 分鐘租約（大模型 NF4 慢速生成需要）
 const PENDING_MAX_MS=600000;    // 卡在 PENDING 超過 10 分鐘 → FAILED
 function agentGate(ageMs){
   if(ageMs===null||ageMs===undefined||!Number.isFinite(ageMs))return "reject";
@@ -12,7 +12,7 @@ function agentGate(ageMs){
   if(ageMs>AGENT_SOFT_MS)return "queue";
   return "ok";
 }
-const FALLBACK_TIMEOUT_MS=300000;
+const FALLBACK_TIMEOUT_MS=3600000;
 function fallbackDecision(gate,fallbackConfigured){
   if(gate!=="reject")return "primary";
   return fallbackConfigured?"fallback":"reject";
@@ -53,7 +53,7 @@ function validJob(input){
   job.model = typeof input.model === "string" ? input.model.slice(0, 120) : "";
   job.lora = typeof input.lora === "string" ? input.lora.slice(0, 120) : "";
   job.turbo = input.turbo === true;
-  job.base_family = typeof input.base_family === "string" && ["sdxl-single","generic","anima"].includes(input.base_family) ? input.base_family : "";
+  job.base_family = typeof input.base_family === "string" && ["sdxl-single","generic","anima","anima-official","qwen-image","moss","krea-single"].includes(input.base_family) ? input.base_family : "";
   if(job.model && !/^[\w.\- \/()]+$/.test(job.model))throw new HttpError(422,"Invalid model name");
   if(job.lora && !/^[\w.\- ]+$/.test(job.lora))throw new HttpError(422,"Invalid lora name");
   if(Object.keys(input).some(k=>!Object.hasOwn(job,k)))throw new HttpError(422,"Unknown job field");

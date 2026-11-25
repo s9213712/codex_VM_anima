@@ -71,7 +71,9 @@ def resolve_source(model: str, kind: str) -> tuple[str, str]:
 
 def guess_family(source: str) -> str:
     low = source.lower()
-    if "circlestone" in low or "anima-" in low:
+    if "circlestone" in low and "diffusers" in low:
+        return "anima-official"
+    if "circlestone" in low or "anima-compile" in low or "anima-" in low:
         return "anima"
     if low.endswith(".safetensors") or low.endswith(".ckpt"):
         return "sdxl-single"
@@ -79,6 +81,30 @@ def guess_family(source: str) -> str:
 
 
 _PIPE_CACHE = {}
+
+ANIMA_OFFICIAL_REPO = "circlestone-labs/Anima-Base-v1.0-Diffusers"
+
+
+def _load_anima_official(src: str, dtype):
+    """Anima 官方（circlestone-labs/Anima，Cosmos-Predict2-2B finetune）。
+    split_files/ 的 safetensors 是 ComfyUI 鍵名（net.* / 無前綴 VAE），不能直接餵
+    diffusers；改用官方同步發布的 diffusers 格式 repo（ModularPipeline，
+    diffusers >= 0.43 原生支援），內含已轉換的 transformer/VAE/Qwen3-0.6B/
+    AnimaTextConditioner/scheduler/t5_tokenizer。"""
+    from diffusers import ModularPipeline
+    repo = src if "/" in src and not src.endswith(".safetensors") else ANIMA_OFFICIAL_REPO
+    pipe = ModularPipeline.from_pretrained(repo)
+    pipe.load_components(dtype=dtype)
+    return pipe
+
+
+def _anima_compat(pipe) -> None:
+    for name, fn in (("enable_model_cpu_offload", lambda: pipe.enable_model_cpu_offload()),
+                     ("enable_attention_slicing", lambda: pipe.enable_attention_slicing())):
+        try:
+            getattr(pipe, name, None)()
+        except Exception as exc:
+            log(f"{name} 跳過: {str(exc)[:80]}")
 
 
 def load_pipe(model: str, family_override: str = ""):
@@ -95,13 +121,25 @@ def load_pipe(model: str, family_override: str = ""):
         return _PIPE_CACHE[key]
     log(f"載入 {src}（family={family}）")
     dtype = torch.float16 if torch.cuda.is_available() else torch.float32
-    if family == "sdxl-single":
-        pipe = StableDiffusionXLPipeline.from_single_file(src, torch_dtype=dtype)
-    elif family == "anima":
-        pipe = DiffusionPipeline.from_pretrained(src, torch_dtype=dtype, trust_remote_code=True)
-    else:
-        pipe = DiffusionPipeline.from_pretrained(src, torch_dtype=dtype)
-    if torch.cuda.is_available():
+    try:
+        if family == "sdxl-single":
+            pipe = StableDiffusionXLPipeline.from_single_file(src, torch_dtype=dtype)
+        elif family == "anima":
+            pipe = DiffusionPipeline.from_pretrained(src, torch_dtype=dtype, trust_remote_code=True)
+        elif family == "anima-official":
+            pipe = _load_anima_official(src, dtype)
+        else:
+            pipe = DiffusionPipeline.from_pretrained(src, torch_dtype=dtype)
+    except Exception as exc:
+        msg = str(exc)
+        if "404" in msg:
+            raise RuntimeError(f"模型載入失敗：HF 上找不到此 repo 或其結構不支援 diffusers 標準載入（404）：{src}")
+        if "401" in msg or "403" in msg:
+            raise RuntimeError(f"模型載入失敗：此 repo 需要在 HuggingFace 網頁登入並同意授權條款後才能下載（401/403）：{src}")
+        raise
+    if family == "anima-official":
+        pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+    elif torch.cuda.is_available():
         try:
             pipe.enable_model_cpu_offload()   # 4GB 卡放不下整支 SDXL，讓 diffusers 分層搬運
         except Exception:

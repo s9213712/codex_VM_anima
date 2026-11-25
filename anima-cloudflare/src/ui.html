@@ -221,11 +221,12 @@ async function refresh(){
     drawResChart(sysv?.history || []);
     $("s-err").textContent = h.last_error || "—";
     const be = h.backend || {};
-    if(be.online !== undefined && !online){
-      $("s-backend").innerHTML = be.online
-        ? '<span class="dot ok"></span>PC fallback（diffusers，在線）'
-        : '<span class="dot bad"></span>PC fallback（離線）';
-    }
+    const labels = {colab:"Colab T4（CLI）", "colab-down":"Colab（隧道斷線）", "colab-unset":"Colab（未設網址）",
+                    local:"本機 Python（Nitro5）", "local-down":"本機（離線）", "local-unset":"本機（未設）",
+                    vm:"VM 代理（Codex）", "vm-down":"VM 代理（離線）", none:"無後端"};
+    $("s-backend").innerHTML = be.online
+        ? '<span class="dot ok"></span>' + (labels[h.active_backend] || h.active_backend) + '（在線）'
+        : '<span class="dot ' + (h.active_backend === "vm" ? 'ok' : 'bad') + '"></span>' + (labels[h.active_backend] || "無後端（任務將失敗）");
     const models = (h.backend && h.backend.models) || [];
     const loras = (h.backend && h.backend.loras) || [];
     const CURATED = ["cagliostrolab/animagine-xl-4.0",

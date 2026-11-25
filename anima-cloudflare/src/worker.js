@@ -25,23 +25,34 @@ export class AnimaRelayV2 {
         const pending=this.rows("SELECT count(*) AS n FROM jobs WHERE status='PENDING'")[0].n;
         const running=this.rows("SELECT count(*) AS n FROM jobs WHERE status='RUNNING'")[0].n;
         const lastError=this.rows("SELECT error FROM jobs WHERE status='FAILED' AND error IS NOT NULL ORDER BY finished DESC LIMIT 1")[0]?.error ?? null;
-        return json({relay:"READY",agent_recent:!!agent && now-agent.observed_at<60000,agent_age_seconds:age,
+        const mode=(this.rows("SELECT value FROM meta WHERE key='backend_mode'")[0]||{}).value||"auto";
+        const agentRecent=!!agent && now-agent.observed_at<60000;
+        const probe=async(base)=>{ try{
+              const r=await fetch(base+"/healthz",{headers:{Authorization:"Bearer "+(this.env.FALLBACK_KEY||"")}, signal:AbortSignal.timeout(4000)});
+              const j=await r.json(); let models=[],loras=[];
+              try{ const mr=await fetch(base+"/models",{headers:{Authorization:"Bearer "+(this.env.FALLBACK_KEY||"")}, signal:AbortSignal.timeout(4000)});
+                const mm=await mr.json(); models=mm.checkpoints||[]; loras=mm.loras||[]; }catch{}
+              return {online:j.ok===true, system:j.system||null, models, loras};
+            }catch{ return {online:false, models:[], loras:[]}; } };
+        let backend={online:false, models:[], loras:[]}, active="none";
+        if(mode==="colab"){
+          const cu=this.rows("SELECT value FROM meta WHERE key='colab_url'")[0];
+          if(cu&&cu.value){ backend=await probe(cu.value.replace(/\/+$/,"")); active=backend.online?"colab":"colab-down"; }
+          else active="colab-unset";
+        }else if(mode==="local"){
+          if(this.env.FALLBACK_URL){ backend=await probe(this.env.FALLBACK_URL.replace(/\/+$/,"")); active=backend.online?"local":"local-down"; }
+          else active="local-unset";
+        }else if(mode==="vm"){
+          active=agentRecent?"vm":"vm-down";
+        }else{
+          if(agentRecent){ active="vm"; }
+          else if(this.env.FALLBACK_URL){ backend=await probe(this.env.FALLBACK_URL.replace(/\/+$/,"")); active=backend.online?"local":"local-down"; }
+          else active="none";
+        }
+        return json({relay:"READY",mode,active_backend:active,agent_recent:agentRecent,agent_age_seconds:age,
           pending,running,last_error:lastError,
           fallback_configured:!!this.env.FALLBACK_URL,
-          backend: (this.env.FALLBACK_URL && !(agent && now-agent.observed_at<60000)) ? await (async()=>{
-            try{
-              const r=await fetch(this.env.FALLBACK_URL+"/healthz",
-                {headers:{Authorization:"Bearer "+(this.env.FALLBACK_KEY||"")}, signal:AbortSignal.timeout(4000)});
-              const j=await r.json();
-              let models=[],loras=[];
-              try{
-                const mr=await fetch(this.env.FALLBACK_URL+"/models",
-                  {headers:{Authorization:"Bearer "+(this.env.FALLBACK_KEY||"")}, signal:AbortSignal.timeout(4000)});
-                const mm=await mr.json(); models=mm.checkpoints||[]; loras=mm.loras||[];
-              }catch{}
-              return {online:j.ok===true, system:j.system||null, models, loras};
-            }catch{ return {online:false, models:[], loras:[]}; }
-          })() : {online:false, models:[], loras:[]},policy:{soft_queue_seconds:AGENT_SOFT_MS/1000,hard_reject_seconds:AGENT_HARD_MS/1000,lease_seconds:LEASE_MS/1000,pending_max_seconds:PENDING_MAX_MS/1000},
+          backend,policy:{soft_queue_seconds:AGENT_SOFT_MS/1000,hard_reject_seconds:AGENT_HARD_MS/1000,lease_seconds:LEASE_MS/1000,pending_max_seconds:PENDING_MAX_MS/1000},
           agent});
       }
       if(path==="/v1/backend" && method==="GET"){
@@ -169,7 +180,12 @@ export class AnimaRelayV2 {
       const headers={"Content-Type":"application/json"};
       if(this.env.FALLBACK_KEY)headers["Authorization"]="Bearer "+this.env.FALLBACK_KEY;
       const res=await fetch(base.replace(/\/+$/,"")+"/generate",{method:"POST",headers,body:JSON.stringify(job),signal:AbortSignal.timeout(FALLBACK_TIMEOUT_MS)});
-      if(!res.ok)throw new Error("Fallback HTTP "+res.status);
+      if(!res.ok){
+        let detail="";
+        try{ const j=await res.json(); detail=(j.error||"").slice(0,300); }catch{}
+        const m=(job&&job.model)?job.model:"";
+        throw new Error("後端出圖失敗 (HTTP "+res.status+")"+(m?" 模型:"+m:"")+(detail?" — "+detail:""));
+      }
       const buf=new Uint8Array(await res.arrayBuffer());
       if(buf.length<8 || [137,80,78,71,13,10,26,10].some((x,i)=>buf[i]!==x))throw new Error("Fallback did not return a PNG");
       const digest=await crypto.subtle.digest("SHA-256",buf);

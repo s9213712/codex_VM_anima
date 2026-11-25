@@ -274,7 +274,7 @@ function drawResChart(hist){
   if(!c || !hist || hist.length < 2) return;
   const ctx = c.getContext("2d");
   ctx.clearRect(0, 0, c.width, c.height);
-  const series = [["cpu", "#7aa2ff"], ["mem", "#67d38b"]];
+  const series = [["cpu", "#7aa2ff"], ["mem", "#67d38b"], ["gpu", "#f7a76c"], ["vram", "#e06c9f"]];
   for(const [key, color] of series){
     const pts = hist.map((p, i) => [i / (hist.length - 1) * c.width, c.height - (p[key] ?? 0) / 100 * c.height]);
     ctx.beginPath();

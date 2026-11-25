@@ -92,7 +92,9 @@ def _load_anima_official(src: str, dtype):
     diffusers >= 0.43 原生支援），內含已轉換的 transformer/VAE/Qwen3-0.6B/
     AnimaTextConditioner/scheduler/t5_tokenizer。"""
     from diffusers import ModularPipeline
-    repo = src if "/" in src and not src.endswith(".safetensors") else ANIMA_OFFICIAL_REPO
+    # split_files 原始 repo（circlestone-labs/Anima）沒有 modular_model_index.json，
+    # 一律導向官方同步發布的 diffusers 格式 repo
+    repo = src if "diffusers" in src.lower() else ANIMA_OFFICIAL_REPO
     pipe = ModularPipeline.from_pretrained(repo)
     pipe.load_components(dtype=dtype)
     return pipe
@@ -139,18 +141,16 @@ def load_pipe(model: str, family_override: str = ""):
         raise
     if family == "anima-official":
         pipe.to("cuda" if torch.cuda.is_available() else "cpu")
-    elif torch.cuda.is_available():
+    if torch.cuda.is_available():
         try:
-            pipe.enable_model_cpu_offload()   # 4GB 卡放不下整支 SDXL，讓 diffusers 分層搬運
-        except Exception:
             pipe.to("cuda")
-        pipe.enable_attention_slicing()
+        except torch.cuda.OutOfMemoryError:
+            try:
+                pipe.enable_model_cpu_offload()   # VRAM 放不下才分層搬運
+            except Exception:
+                pipe.enable_sequential_cpu_offload()
     else:
         pipe.enable_attention_slicing()
-        try:
-            pipe.enable_model_cpu_offload()
-        except Exception:
-            pass
     with _lock:
         _pipes.clear()
         _PIPE_CACHE.clear()
@@ -229,6 +229,13 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def _mem(self):
+        try:
+            import psutil
+            vm = psutil.virtual_memory()
+            return {"used": round(vm.used / 1e9, 1), "total": round(vm.total / 1e9, 1),
+                    "percent": vm.percent}
+        except Exception:
+            pass
         try:
             import ctypes
 

@@ -213,14 +213,29 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             return None
 
-    def _hist(self, cpu, memp):
+    def _gpu(self):
+        try:
+            import pynvml
+            if not getattr(self.server, "_nvml", None):
+                pynvml.nvmlInit()
+                self.server._nvml = pynvml.nvmlDeviceGetHandleByIndex(0)
+            h = self.server._nvml
+            u = pynvml.nvmlDeviceGetUtilizationRates(h)
+            m = pynvml.nvmlDeviceGetMemoryInfo(h)
+            return {"util_percent": u.gpu, "vram_used": round(m.used / 1e9, 1),
+                    "vram_total": round(m.total / 1e9, 1)}
+        except Exception:
+            return None
+
+    def _hist(self, cpu, memp, gpu=None, vram=None):
         try:
             import time as _t
             if not hasattr(self.server, "_hist"):
                 self.server._hist = []
             h = self.server._hist
             if cpu is not None or memp is not None:
-                h.append({"t": int(_t.time()), "cpu": cpu, "mem": memp})
+                h.append({"t": int(_t.time()), "cpu": cpu, "mem": memp,
+                          "gpu": gpu, "vram": vram})
                 del h[:-60]
             return h
         except Exception:
@@ -240,10 +255,13 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/healthz":
             cpu = self._cpu()
             mem = self._mem()
+            gpu = self._gpu()
             return self._json(200, {"ok": True, "engine": "diffusers-universal",
-                                    "system": {"memory": mem,
+                                    "system": {"memory": mem, "gpu": gpu,
                                                "cpu": {"usage_percent": cpu},
-                                               "history": self._hist(cpu, mem["percent"] if mem else None)}})
+                                               "history": self._hist(cpu, mem["percent"] if mem else None,
+                                                                     gpu["util_percent"] if gpu else None,
+                                                                     gpu["vram_used"] if gpu else None)}})
         if self.path == "/models":
             return self._json(200, {
                 "checkpoints": sorted(set(local_models("checkpoint")) | set(registry().keys())),

@@ -214,7 +214,8 @@ async function refresh(){
     const cpu = sysv?.cpu?.usage_percent ?? sysv?.cpu?.quota_usage_percent ?? null;
     const memU = Number(sysv?.memory?.used ?? (sysv?.memory?.used_bytes ? sysv.memory.used_bytes/1e9 : NaN));
     const memT = Number(sysv?.memory?.total ?? (sysv?.memory?.limit_bytes ? sysv.memory.limit_bytes/1e9 : NaN));
-    $("s-res").textContent = (cpu != null || !isNaN(memT)) ? `${cpu ?? "?"}% · ${isNaN(memU)?"?":memU.toFixed(1)}/${isNaN(memT)?"?":memT.toFixed(0)}GB` : "—";
+    const gpu = sysv?.gpu || null;
+    $("s-res").textContent = (cpu != null || !isNaN(memT)) ? `${cpu ?? "?"}% · RAM ${isNaN(memU)?"?":(memU/1.0737).toFixed(1)}/${isNaN(memT)?"?":Math.round(memT/1.0737)}G · GPU ${gpu?`${gpu.util_percent}% VRAM ${gpu.vram_used}/${gpu.vram_total}G`:"—"}` : "—";
     drawResChart(sysv?.history || []);
     $("s-err").textContent = h.last_error || "—";
     const be = h.backend || {};

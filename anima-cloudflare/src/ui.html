@@ -90,6 +90,7 @@
         <div class="stat"><span>模型</span><span id="s-model">—</span></div>
         <div class="stat"><span>佇列</span><span id="s-queue">—</span></div>
         <div class="stat"><span>CPU / 記憶體</span><span id="s-res">—</span></div>
+        <div class="stat"><span>GPU / VRAM</span><span id="s-gpu">—</span></div>
         <canvas id="res-chart" width="300" height="56" style="width:100%;height:56px;margin-top:4px"></canvas>
         <div class="stat"><span>最近錯誤</span><span id="s-err" class="err">—</span></div>
         <div class="hint" id="s-policy"></div>
@@ -215,7 +216,8 @@ async function refresh(){
     const memU = Number(sysv?.memory?.used ?? (sysv?.memory?.used_bytes ? sysv.memory.used_bytes/1e9 : NaN));
     const memT = Number(sysv?.memory?.total ?? (sysv?.memory?.limit_bytes ? sysv.memory.limit_bytes/1e9 : NaN));
     const gpu = sysv?.gpu || null;
-    $("s-res").textContent = (cpu != null || !isNaN(memT)) ? `${cpu ?? "?"}% · RAM ${isNaN(memU)?"?":(memU/1.0737).toFixed(1)}/${isNaN(memT)?"?":Math.round(memT/1.0737)}G · GPU ${gpu?`${gpu.util_percent}% VRAM ${gpu.vram_used}/${gpu.vram_total}G`:"—"}` : "—";
+    $("s-res").textContent = (cpu != null || !isNaN(memT)) ? `${cpu ?? "?"}% · ${isNaN(memU)?"?":(memU/1.0737).toFixed(1)}/${isNaN(memT)?"?":Math.round(memT/1.0737)}G` : "—";
+    $("s-gpu").textContent = gpu ? `${gpu.util_percent}% · ${gpu.vram_used}/${gpu.vram_total}G` : "—";
     drawResChart(sysv?.history || []);
     $("s-err").textContent = h.last_error || "—";
     const be = h.backend || {};
